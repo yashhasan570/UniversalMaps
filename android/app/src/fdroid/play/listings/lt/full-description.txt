@@ -1,0 +1,44 @@
+Universal Maps – tai greita ir išsami neprisijungus veikiančių žemėlapių ir GPS navigacijos programėlė kelionėms, žygiams, trekingui ir dviračių nuotykiams. Planuokite, importuokite ir įrašykite maršrutus bei mėgaukitės sklandžia navigacija neeikvodami baterijos ir be interneto. Programėlė siūlo neribotą žemėlapių atsisiuntimą ir atnaujinimus kas dvi savaites. Paremta OpenStreetMap, kuriama savanorių, užtikrinanti privatumą, veikianti 100 % neprisijungus ir visiškai nemokama.
+
+<b>NEPRISIJUNGUS:</b> Programėlė veikia 100 % neprisijungus – įskaitant paiešką ir navigaciją. Naršykite žemėlapį ir keliaukite be interneto, taupydami mobiliuosius duomenis ir tarptinklinio ryšio mokesčius. Kadangi duomenys fone nesiunčiami, baterija veikia daug ilgiau.
+
+<b>GREITA:</b> Priartinimas, paieška ir maršrutų skaičiavimas veikia itin greitai.
+
+<b>DETALI IR ATNAUJINTA:</b> Žemėlapiai labai detalūs ir atnaujinami du kartus per mėnesį. Skirtingai nei daugelyje žinomų konkurentų, juose yra pastatų pavadinimai, suoliukai, žygių takai ir kita naudinga informacija.
+
+<b>PAREMTA OPENSTREETMAP:</b> OpenStreetMap – tai pasaulinis vikio principu kuriamas žemėlapis, kurį kuria ir prižiūri milijonai savanorių – vietos gyventojų, geriausiai pažįstančių savo apylinkes. Dėl šio bendruomenės darbo žemėlapiai labai detalūs, o mažiau kartografuotose vietovėse dažnai tikslesni už komercinius. Universal Maps duomenis iš OpenStreetMap atnaujina kas dvi savaites. Pastebėjote, kad kažko trūksta? Galite tai pridėti į OpenStreetMap ir patobulinti žemėlapį visiems.
+
+<b>PRIVATUMAS – PIRMIAUSIA:</b> Mes nerenkame jokių duomenų ar identifikatorių. Tai reiškia, kad nėra duomenų nutekėjimo rizikos, reklamų ar įkyrių pranešimų – tik švari ir privati žemėlapio patirtis.
+
+<b>SVARBIAUSIOS FUNKCIJOS</b>
+
+<b>VIETŲ PAIEŠKA:</b> Ieškokite pagal adresą, pavadinimą ar kategoriją, atraskite milijonus lankytinų vietų ir peržiūrėkite išsamią informaciją: darbo laiką, Vikipedijos straipsnius, pritaikymą neįgaliųjų vežimėliams ir kt.
+
+<b>GPS NAVIGACIJA:</b> Balso nurodymai kiekviename posūkyje. Kurkite maršrutus pėsčiomis, žygiams, dviračiu ar automobiliu – taip pat tarp miestų ir šalių, su keliais tarpiniais taškais. Palaikomas Android Auto.
+
+<b>ŽYGIŲ IR DVIRAČIŲ TAKAI IŠ VISO PASAULIO:</b> Įjunkite specialius žemėlapio sluoksnius ir atraskite populiarius žygių ir dviračių maršrutus visame pasaulyje – visi iš OpenStreetMap. Perjunkite sluoksnius ir matykite spalvotus dviračių bei MTB maršrutus ir oficialius žygių takus.
+
+<b>3D RELJEFAS IR GYLIAI:</b> Tyrinėkite kalnų aukščius, jūrų gylius ir detalias horizontales. Bakstelėkite bet kurią žemėlapio vietą, kad sužinotumėte jos aukštį.
+
+<b>VIEŠASIS TRANSPORTAS:</b> Planuokite maršrutus viešuoju transportu – metro, lengvuoju geležinkeliu, autobusu ir tramvajumi. Matykite maršrutų numerius stotelėse.
+
+<b>ŽEMĖLAPIŲ STILIAI:</b> Pasirinkite sluoksnį pagal veiklą: Lauko veikla, Horizontalės, Žygiai, Dviračiai arba Metro.
+
+<b>MARŠRUTŲ ĮRAŠYMAS:</b> Įrašykite, importuokite, eksportuokite ir bendrinkite maršrutus bei mėgstamas vietas. Palaikomi KML, KMZ, GPX ir GeoJSON formatai.
+
+<b>VIKIPEDIJOS STRAIPSNIAI:</b> Skaitykite Vikipedijos straipsnius apie vietas žemėlapyje. Paieškoje įveskite „?wiki“ ir pamatysite visas vietas, turinčias straipsnį.
+
+<b>ŽEMĖLAPIO REDAKTORIUS:</b> Pridėkite trūkstamas vietas arba redaguokite žemėlapį tiesiai programėlėje ir taip prisidėkite prie OpenStreetMap tobulinimo.
+
+<b>TAMSUS REŽIMAS:</b> Įjunkite tamsią temą patogiam naudojimui naktį.
+
+Išbandykite programėlę – ji 100 % nemokama, be reklamų, greita ir veikia neprisijungus.
+
+Universal Maps – nepriklausomas, bendruomenės kuriamas atvirojo kodo projektas, kuriame dalyvauja šimtai bendraautorių.
+
+Sužinokite, kaip paremti projektą: https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Jūsų atsiliepimai ir įvertinimai parduotuvėje mus motyvuoja! Turite klausimų? Apsilankykite universalmaps.app.
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsApp

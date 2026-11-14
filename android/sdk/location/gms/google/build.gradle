@@ -1,0 +1,28 @@
+plugins {
+  id 'com.android.library'
+}
+
+apply from: "${rootProject.rootDir}/groovy/common-config.gradle"
+apply from: "${rootProject.rootDir}/groovy/publishing.gradle"
+
+android {
+  namespace = 'com.universalmaps.app.sdk.location.gms'
+  // enableKotlin = true  // see app/build.gradle
+}
+
+dependencies {
+  implementation project(':sdk')
+  api project(':sdk:location:core')
+
+  implementation libs.androidx.annotation
+  implementation libs.google.gms.location
+
+  testImplementation libs.androidx.junit
+  testImplementation libs.mockito.core
+  testImplementation libs.robolectric
+}
+
+Publish(project, [
+    'name'       : 'Universal Maps SDK. Google Fused Location',
+    'description': 'A library that provides Google fused location services for the Universal Maps SDK'
+])

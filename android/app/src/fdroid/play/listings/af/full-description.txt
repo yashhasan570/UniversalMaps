@@ -1,0 +1,74 @@
+Universal Maps is 'n vinnige, gedetailleerde aflynkaart- en GPS-navigasie-app vir reis-, stap-, trek- en fietsavonture. Beplan, voer in en teken roetes, en geniet naatlose navigasie sonder om jou battery leeg te maak of 'n internetverbinding te gebruik. Die app bied onbeperkte kaartaflaaie en tweeweeklikse opdaterings. Gebaseer op OpenStreetMap, deur vrywilligers gemaak, privaatheid eerste, 100% vanlyn en 100% gratis.
+
+<b>VANLYN:</b>
+
+Die app werk 100% vanlyn — insluitend soektog en navigasie. Jy kan die kaart verken en navigeer sonder 'n internetverbinding, wat mobiele data en roamingfooie bespaar. En met geen agtergronddata-oordragte nie, hou jou battery baie langer.
+
+<b>SNEL:</b>
+
+Inzoom, soektog en roeterrekeninge werk merkbaar vinnig.
+
+<b>DETAILLEERD & BYGEDATEER:</b>
+
+Die kaarte is ryk aan besonderhede en word twee keer per maand opgedateer om werklike toestande te weerspieël. Anders as baie bekende mededingers, sluit hulle gebou-etikette, bankies, staproetes en ander nuttige inligting in.
+
+<b>OP OPENSTREETMAP GEBASEER:</b>
+
+OpenStreetMap is 'n wiki-styl wêreldkaart wat deur miljoene vrywilligers gebou en in stand gehou word — plaaslike inwoners wat hul gebiede die beste ken. Hierdie gemeenskapsinisiatief lei tot hoogs gedetailleerde kaarte wat dikwels akkurater is as kommersiële kaarte in minder-gekarteerde streke. Universal Maps werk sy data van OpenStreetMap elke twee weke by, sodat jou kaarte vars en betroubaar bly. En as jy iets mis, kan jy dit by OpenStreetMap voeg en help om die kaart vir almal te verbeter.
+
+<b>PRIVAATHEID-EERS:</b>
+
+Ons versamel geen data of identifiseerders nie. Dit beteken daar is geen risiko van datalekke en geen afleidings soos advertensies of lawaaierige kennisgewings nie — net 'n skoon, privaat kaart-ervaring.
+
+<b>BELANGRIKE FUNKSIES</b>
+
+<b>VERKEN PLEKKE:</b>
+
+Soek volgens adres, naam of kategorie, ontdek miljoene belangrike plekke (POI's), en besigtig gedetailleerde inligting soos openingstye, Wikipedia-artikels, rolstoeltoeganklikheid en ander nuttige besonderhede.
+
+<b>GPS-NAVIGASIE:</b>
+
+Geniet stemgelaaide, draai-vir-draai-aanwysings. Skep stap-, staptoer-, fietsry- of ryroetes — insluitend roetes tussen stede, lande en verskeie wegpunte. Android Auto word ondersteun.
+
+<b>STAP- EN FIETSROETES VAN OOR DIE WÊRELD:</b>
+
+Skakel spesiale kaartlae aan om gewilde stap- en fietspaaie wêreldwyd te ontdek, almal verkry vanaf OpenStreetMap. Skakel tussen lae om gekleurde fiets- en bergfietspaaie, sowel as amptelike staproetes, te sien.
+
+<b>3D-TERREIN & DIEPTES:</b>
+
+Verken berghoogtes, seedieptes en gedetailleerde kontoerlyne. Tik enige plek op die kaart om die hoogte te sien.
+
+<b>OPENBARE VERVOER:</b>
+
+Beplan roetes met openbare vervoer. Intydse roosters is in ontwikkeling.
+
+<b>KAARTSTYLE:</b>
+
+Kies kaartlae wat by jou aktiwiteit pas — Buitelug, Kontuurlyne, Staptog, Fietsry, of Metro/Metro.
+
+<b>ROETE-OPNEMER:</b>
+
+Neem op, voer in, voer uit en deel jou roetes en gunstelingplekke. Ondersteun KML-, KMZ-, GPX- en GeoJSON-formate.
+
+<b>WIKIPEDIA-ARTIKELS:</b>
+
+Verken Wikipedia-artikels oor plekke wat jy op die kaart ontdek. Tik "?wiki" in die soekbalk om alle plekke met Wikipedia-artikels te vind.
+
+<b>KAARTREDIGEERDER:</b>
+
+Dra by tot OpenStreetMap deur ontbrekende plekke by te voeg of die kaart direk vanuit Universal Maps te redigeer.
+
+<b>DONKERMODUS:</b>
+
+Skakel oor na 'n donker tema vir gemaklike besigtiging snags.
+
+Universal Maps is 'n onafhanklike, gemeenskapsgedrewe, oopbronprojek met honderde bydraers wat help om nuwe funksies te ontwikkel, probleme reg te stel, te vertaal en die projek vorentoe te beweeg.
+
+Of leer ander maniere om die projek te ondersteun: https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Jou eerlike terugvoer en resensies in die winkel motiveer ons! Ons hoor graag van jou daar.
+
+Het jy vrae? Besoek asseblief die universalmaps.app-webwerf vir bykomende besonderhede en gereelde vrae.
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsApp

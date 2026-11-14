@@ -1,0 +1,80 @@
+package com.universalmaps.app.wear.protocol.gms
+
+import com.universalmaps.app.wear.protocol.WearNavigationData
+import com.universalmaps.app.wear.protocol.WearNavigationMode
+import com.google.android.gms.wearable.DataMap
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class WearNavigationDataMapCodecTest {
+    @Test
+    fun roundTripNavigation() {
+        val dataMap = DataMap()
+        WearNavigationDataMapCodec.encode(dataMap, WearNavigationMode.NAVIGATION)
+
+        assertEquals(WearNavigationMode.NAVIGATION, WearNavigationDataMapCodec.decode(dataMap))
+    }
+
+    @Test
+    fun roundTripNormal() {
+        val dataMap = DataMap()
+        WearNavigationDataMapCodec.encode(dataMap, WearNavigationMode.NORMAL)
+
+        assertEquals(WearNavigationMode.NORMAL, WearNavigationDataMapCodec.decode(dataMap))
+    }
+
+    @Test
+    fun encodeUsesStableSchema() {
+        val normalDataMap = DataMap()
+        WearNavigationDataMapCodec.encode(normalDataMap, WearNavigationMode.NORMAL)
+
+        assertEquals(WearNavigationData.VERSION, normalDataMap.getInt("version", -1))
+        assertEquals("NORMAL", normalDataMap.getString("mode"))
+
+        val navigationDataMap = DataMap()
+        WearNavigationDataMapCodec.encode(navigationDataMap, WearNavigationMode.NAVIGATION)
+
+        assertEquals(WearNavigationData.VERSION, navigationDataMap.getInt("version", -1))
+        assertEquals("NAVIGATION", navigationDataMap.getString("mode"))
+    }
+
+    @Test
+    fun versionMismatchReturnsNull() {
+        assertNull(WearNavigationDataMapCodec.decode(dataMap(999, "NAVIGATION")))
+    }
+
+    @Test
+    fun missingVersionReturnsNull() {
+        val dataMap = DataMap()
+        dataMap.putString(WearNavigationData.KEY_MODE, "NAVIGATION")
+
+        assertNull(WearNavigationDataMapCodec.decode(dataMap))
+    }
+
+    @Test
+    fun missingModeReturnsNull() {
+        val dataMap = DataMap()
+        dataMap.putInt(WearNavigationData.KEY_VERSION, WearNavigationData.VERSION)
+
+        assertNull(WearNavigationDataMapCodec.decode(dataMap))
+    }
+
+    @Test
+    fun unknownModeReturnsNull() {
+        assertNull(WearNavigationDataMapCodec.decode(dataMap(WearNavigationData.VERSION, "BOGUS")))
+    }
+
+    @Test
+    fun unknownFieldIsIgnored() {
+        val dataMap = dataMap(WearNavigationData.VERSION, "NAVIGATION")
+        dataMap.putBoolean("unknown", true)
+
+        assertEquals(WearNavigationMode.NAVIGATION, WearNavigationDataMapCodec.decode(dataMap))
+    }
+
+    private fun dataMap(version: Int, mode: String) = DataMap().apply {
+        putInt(WearNavigationData.KEY_VERSION, version)
+        putString(WearNavigationData.KEY_MODE, mode)
+    }
+}

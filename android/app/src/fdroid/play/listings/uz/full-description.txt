@@ -1,0 +1,34 @@
+Universal Maps sayohat, piyoda yurish, tog'da yurish va velosiped sayohatlari uchun tez, batafsil oflayn xarita va GPS navigatsiya ilovasi. Marshrutlarni rejalashtiring, import qiling va yozib oling, batareyangizni quvvatini sarflamasdan yoki internet ulanishisiz silliq yo'l-yo'riqdan bahramand bo'ling. Tashqi sarguzashtlaringiz va dunyo bo'ylab sayohatlaringiz davomida joylarni kashf eting va xavfsiz navigatsiya qiling. Ilova cheksiz xaritalarni yuklab olish va har ikki haftada yangilanishlarni taklif etadi. OpenStreetMap asosida, ko'ngillilar tomonidan yaratilgan, maxfiylikni birinchi o'ringa qo'yadigan, 100% oflayn va 100% bepul.
+
+
+
+<b>OPENSTREETMAP ASOSIDA:</b> OpenStreetMap — bu wiki-uslubidagi dunyo xaritasi bo'lib, uni millionlab ko'ngillilar — o'z hududlarini eng yaxshi biluvchi mahalliy aholi — yaratadi va yangilab boradi. Ushbu jamoaviy sa'y-harakat natijasida yuqori darajada batafsil xaritalar hosil bo'ladi, ular kamroq xaritalangan hududlarda tijorat xaritalaridan ko'ra aniqroq bo'lishi mumkin. Universal Maps har ikki haftada OpenStreetMap ma'lumotlarini yangilab, xaritalaringizni yangi va ishonchli saqlaydi. Agar nimadir yetishmayotganini sezsangiz, uni OpenStreetMapga qo'shib, xaritalarni hammaga yaxshiroq qilishda yordam berishingiz mumkin.
+
+<b>MUHIM XUSUSIYATLAR</b>
+
+<b>JOYLARNI KASHF ETING:</b> Manzil, nom yoki toifaga ko'ra qidiring, millionlab POI-larni (qiziqarli joylarni) kashf eting va ochilish vaqtlari, Vikipediya maqolalari, nogironlar aravachasi uchun mosligi va boshqa foydali ma'lumotlar kabi batafsil ma'lumotlarni ko'ring.
+
+<b>GPS NAVIGATSIYASI:</b> Ovozli ko'rsatmalardan foydalanib, burilishma-burilishma yo'nalishlarni oling. Yurish, piyoda sayr, velosipedda sayr yoki avtomobil yo'nalishlarini yarating — shaharlar, mamlakatlar va bir nechta nuqtalar o'rtasidagi yo'llarni ham. Metro safarlari va kundalik qatnovlaringiz uchun eng yaxshi yo'nalishlarni toping. Android Auto qo'llab-quvvatlanadi.
+
+<b>DUNYO BO'YLAB PIYODA VA VELOSIPED YO'LLARI:</b> Maxsus xarita qatlamlarini yoqib, OpenStreetMap manbasidan olingan dunyo bo'ylab mashhur piyoda va velosiped yo'llarini kashf eting. Qatlamlar o'rtasida almashtirib, rangli velosiped va tog' velosipedi (MTB) yo'llari hamda rasmiy piyoda yo'llarini ko'ring.
+
+<b>3D RELYEF VA CHUQURLIKLAR:</b> Tog'larning balandligi, dengizlarning chuqurligi va batafsil balandlik chiziqlarini ko'ring. Balandlikni bilish uchun xaritaning istalgan joyiga bosing.
+
+<b>JAMOAT TRANSPORTI:</b> Jamoat transporti yo'nalishlarini rejalashtiring. Jonli jadvallar ustida ishlanmoqda.
+
+<b>WIKIPEDIA MAQOLALARI:</b> Xaritada topgan joylaringiz bo'yicha Wikipedia maqolalarini o'rganing. Qidiruvga "?wiki" yozing va Wikipedia maqolalariga ega barcha joylarni toping.
+
+<b>XARITA MUHARRIRI:</b> OpenStreetMap'ga hissa qo'shing: yetishmayotgan joylarni qo'shing yoki Universal Maps'dan to'g'ridan-to'g'ri xarita tahrir qiling.
+
+<b>QORONG'I REJIM:</b> Tunda qulay ko'rish uchun qora mavzuga o'ting.
+
+Ilovani sinab ko'ring — u 100% bepul, reklamasiz, tez va to'liq oflayn. Dunyoning istalgan burchagida piyoda sayr, velosipedda sayr, trekking va sayohat uchun ishonchli GPS navigatsiyasidan bahramand bo'ling! Tez, ishonchli va maxfiy xarita tajribasidan zavqlaning va uni boshqalar bilan baham ko'ring!
+
+Universal Maps — bu mustaqil, jamoatchilik tomonidan boshqariladigan, ochiq manbali loyiha bo'lib, yuzlab hissa qo'shuvchilar yangi funksiyalarni ishlab chiqish, muammolarni tuzatish, tarjima qilish va loyihani rivojlantirishga yordam beradi.
+
+Yoki loyihani qo'llab-quvvatlashning boshqa usullarini o'rganing: https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Dukandagi halol fikr-mulohazalaringiz va sharhlaringiz bizni rag'batlantiradi! Biz sizning fikrlaringizni o'sha yerda eshitishni yaxshi ko'ramiz. Savollaringiz bormi? Qo'shimcha ma'lumot va tez-tez so'raladigan savollar (FAQ) uchun universalmaps.app saytiga tashrif buyuring.
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsApp

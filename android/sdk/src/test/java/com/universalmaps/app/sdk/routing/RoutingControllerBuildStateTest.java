@@ -1,0 +1,134 @@
+package com.universalmaps.app.sdk.routing;
+
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
+import com.universalmaps.app.sdk.Router;
+import com.universalmaps.app.sdk.util.log.Logger;
+import java.lang.reflect.Field;
+import org.junit.Test;
+import org.mockito.MockedStatic;
+
+public class RoutingControllerBuildStateTest
+{
+  private static final String[] MISSING_MAPS = {"Poland_Lodz Voivodeship"};
+
+  @Test
+  public void needMoreMapsAfterFoundRouteKeepsItBuilt() throws ReflectiveOperationException
+  {
+    assertEquals(RoutingController.BuildState.BUILT, onNeedMoreMaps(RoutingController.BuildState.BUILT));
+  }
+
+  @Test
+  public void needMoreMapsWithoutRouteIsBuildError() throws ReflectiveOperationException
+  {
+    assertEquals(RoutingController.BuildState.ERROR, onNeedMoreMaps(RoutingController.BuildState.BUILDING));
+  }
+
+  @Test
+  public void carAvoidancesDoNotCauseBicycleOptionsError() throws ReflectiveOperationException
+  {
+    verifyModeOptionsError(false);
+  }
+
+  @Test
+  public void bicycleAvoidancesCauseBicycleOptionsError() throws ReflectiveOperationException
+  {
+    verifyModeOptionsError(true);
+  }
+
+  private static void verifyModeOptionsError(boolean bicycleOptions) throws ReflectiveOperationException
+  {
+    final RoutingController controller = new RoutingController();
+    final RoutingController.Container container = mock(RoutingController.Container.class);
+    controller.attach(container);
+    final Field router = RoutingController.class.getDeclaredField("mLastRouterType");
+    router.setAccessible(true);
+    router.set(controller, Router.Bicycle);
+    try (MockedStatic<Logger> ignored = mockStatic(Logger.class);
+         MockedStatic<RoutingOptions> options = mockStatic(RoutingOptions.class))
+    {
+      options.when(() -> RoutingOptions.hasAnyOptions(Router.Vehicle)).thenReturn(true);
+      options.when(() -> RoutingOptions.hasAnyOptions(Router.Bicycle)).thenReturn(bicycleOptions);
+      controller.getRoutingListenerForTesting().onRoutingEvent(ResultCodes.ROUTE_NOT_FOUND, new String[0]);
+      options.verify(() -> RoutingOptions.hasAnyOptions(Router.Vehicle), never());
+    }
+    if (bicycleOptions)
+      verify(container).onDrivingOptionsBuildError();
+    else
+      verify(container).onCommonBuildError(ResultCodes.ROUTE_NOT_FOUND, new String[0]);
+  }
+
+  @Test
+  public void cancelledAndSuccessfulResultsDoNotProduceDrivingWarnings() throws ReflectiveOperationException
+  {
+    for (int code : new int[] {ResultCodes.CANCELLED, ResultCodes.NO_ERROR})
+    {
+      final RoutingController controller = cachedResult(code);
+      final RoutingController.Container container = mock(RoutingController.Container.class);
+      controller.attach(container);
+      try (MockedStatic<Logger> ignored = mockStatic(Logger.class);
+           MockedStatic<RoutingOptions> options = mockStatic(RoutingOptions.class))
+      {
+        options.when(() -> RoutingOptions.hasAnyOptions(Router.Vehicle)).thenReturn(true);
+        controller.restore();
+      }
+      verify(container, never()).onDrivingOptionsWarning();
+    }
+  }
+
+  @Test
+  public void cachedWarningsAreDeliveredOnceWhenTheContainerRestores() throws ReflectiveOperationException
+  {
+    final RoutingController controller = cachedResult(ResultCodes.HAS_WARNINGS);
+    final RoutingController.Container container = mock(RoutingController.Container.class);
+    controller.attach(container);
+    controller.onSaveState(container);
+    try (MockedStatic<Logger> ignored = mockStatic(Logger.class))
+    {
+      controller.restore();
+      controller.restore();
+    }
+    verify(container, times(1)).onDrivingOptionsWarning();
+  }
+
+  private static RoutingController cachedResult(int code) throws ReflectiveOperationException
+  {
+    final RoutingController controller = new RoutingController();
+    setField(controller, "mLastResultCode", code);
+    setField(controller, "mContainsCachedResult", true);
+    setField(controller, "mLastRouterType", Router.Vehicle);
+    return controller;
+  }
+
+  private static void setField(RoutingController controller, String name, Object value)
+      throws ReflectiveOperationException
+  {
+    final Field field = RoutingController.class.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(controller, value);
+  }
+
+  private static RoutingController.BuildState onNeedMoreMaps(RoutingController.BuildState state)
+      throws ReflectiveOperationException
+  {
+    final RoutingController controller = new RoutingController();
+    final RoutingController.Container container = mock(RoutingController.Container.class);
+    controller.attach(container);
+    final Field buildState = RoutingController.class.getDeclaredField("mBuildState");
+    buildState.setAccessible(true);
+    buildState.set(controller, state);
+
+    try (MockedStatic<Logger> ignored = mockStatic(Logger.class))
+    {
+      controller.getRoutingListenerForTesting().onRoutingEvent(ResultCodes.NEED_MORE_MAPS, MISSING_MAPS);
+    }
+
+    verify(container).onCommonBuildError(ResultCodes.NEED_MORE_MAPS, MISSING_MAPS);
+    return controller.getBuildState();
+  }
+}

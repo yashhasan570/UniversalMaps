@@ -1,0 +1,45 @@
+package com.universalmaps.app.sdk.location;
+
+import androidx.annotation.Keep;
+import com.universalmaps.app.sdk.bookmarks.data.ElevationInfo;
+import com.universalmaps.app.sdk.bookmarks.data.TrackStatistics;
+
+public class TrackRecorder
+{
+  public static native void nativeStartTrackRecording();
+
+  public static native void nativeStopTrackRecording();
+
+  public static native void nativeDiscardTrackRecording();
+
+  public static native void nativeSaveTrackRecordingWithName(String name);
+
+  public static native boolean nativeIsTrackRecordingEmpty();
+
+  public static native boolean nativeIsTrackRecordingEnabled();
+
+  public static native void nativeSetTrackRecordingStatsListener(TrackRecorder.TrackRecordingUpdateHandler listener);
+
+  public static native ElevationInfo nativeGetElevationInfo();
+
+  /** Saves the recorded track, if there is anything to save, stops the recording and reports whether it saved. */
+  public static boolean saveAndStop()
+  {
+    final boolean saved = !nativeIsTrackRecordingEmpty();
+    if (saved)
+    {
+      nativeSaveTrackRecordingWithName("");
+      nativeStopTrackRecording();
+    }
+    else
+      nativeDiscardTrackRecording();
+    return saved;
+  }
+
+  public interface TrackRecordingUpdateHandler
+  {
+    @Keep
+    @SuppressWarnings("unused")
+    void onTrackRecordingUpdate(TrackStatistics trackStatistics);
+  }
+}

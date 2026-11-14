@@ -1,0 +1,42 @@
+Universal Maps je brza i detaljna aplikacija za offline mape i GPS navigaciju za putovanja, planinarenje, treking i biciklističke avanture. Planirajte, uvozite i snimajte rute i uživajte u glatkoj navigaciji bez pražnjenja baterije i bez internet veze. Istražujte mesta i krećite se bezbedno tokom avantura na otvorenom i putovanja širom sveta. Aplikacija nudi neograničeno preuzimanje mapa i ažuriranja svake dve nedelje. Zasnovana je na OpenStreetMap-u, prave je volonteri, privatnost joj je na prvom mestu, radi 100% offline i potpuno je besplatna.
+
+<b>OFFLINE:</b> Aplikacija radi 100% offline — uključujući pretragu i navigaciju. Možete istraživati mapu i navigirati bez internet veze, štedeći mobilne podatke i troškove rominga. Bez prenosa podataka u pozadini, baterija traje znatno duže.
+
+<b>BRZO:</b> Zumiranje, pretraga i računanje ruta rade izuzetno brzo.
+
+<b>DETALJNO I AŽURIRANO:</b> Mape su bogate detaljima i osvežavaju se dva puta mesečno kako bi odražavale stvarno stanje. Za razliku od mnogih poznatih konkurenata, sadrže oznake zgrada, klupe, planinarske staze i druge korisne informacije.
+
+<b>ZASNOVANO NA OPENSTREETMAP-U:</b> OpenStreetMap je svetska mapa u stilu Vikipedije koju grade i održavaju milioni volontera — meštani koji najbolje poznaju svoje područje. Zahvaljujući tome, mape su veoma detaljne i u slabije mapiranim regionima često preciznije od komercijalnih. Universal Maps ažurira podatke sa OpenStreetMap-a svake dve nedelje, pa su mape uvek sveže i pouzdane. Ako primetite da nešto nedostaje, možete to sami dodati u OpenStreetMap i pomoći da mapa bude bolja za sve.
+
+<b>PRIVATNOST NA PRVOM MESTU:</b> Ne prikupljamo nikakve podatke ni identifikatore. To znači da nema rizika od curenja podataka, a nema ni ometanja poput oglasa ili napadnih obaveštenja — samo čista, privatna mapa.
+
+<b>VAŽNE FUNKCIJE</b>
+
+<b>ISTRAŽITE MESTA:</b> Pretražujte po adresi, nazivu ili kategoriji, otkrijte milione zanimljivih mesta i pogledajte detalje kao što su radno vreme, članci sa Vikipedije, pristupačnost za invalidska kolica i druge korisne informacije.
+
+<b>GPS NAVIGACIJA:</b> Glasovna navigacija skretanje po skretanje. Kreirajte pešačke, planinarske, biciklističke ili automobilske rute — uključujući rute između gradova i zemalja, kao i rute sa više tačaka. Podržan je Android Auto.
+
+<b>PLANINARSKE I BICIKLISTIČKE STAZE IZ CELOG SVETA:</b> Uključite posebne slojeve mape i otkrijte popularne planinarske i biciklističke rute širom sveta, sve iz OpenStreetMap-a. Menjajte slojeve da biste videli obojene biciklističke i MTB rute, kao i zvanične planinarske staze.
+
+<b>3D TEREN I DUBINE:</b> Istražite planinske visine, morske dubine i detaljne izohipse. Dodirnite bilo koje mesto na mapi da biste videli nadmorsku visinu.
+
+<b>JAVNI PREVOZ:</b> Planirajte rute javnim prevozom — metroom, lakom železnicom, autobusom i tramvajem. Pogledajte brojeve linija na stajalištima.
+
+<b>STILOVI MAPE:</b> Izaberite slojeve mape koji odgovaraju vašoj aktivnosti — Na otvorenom, Izohipse, Planinarenje, Biciklizam ili Metro.
+
+<b>SNIMAČ RUTA:</b> Snimajte, uvozite, izvozite i delite svoje rute i omiljena mesta. Podržani formati: KML, KMZ, GPX i GeoJSON.
+
+<b>ČLANCI SA VIKIPEDIJE:</b> Čitajte članke sa Vikipedije o mestima koja otkrijete na mapi. Ukucajte „?wiki“ u pretragu da biste pronašli sva mesta sa člancima.
+
+<b>UREĐIVAČ MAPE:</b> Doprinesite OpenStreetMap-u tako što ćete dodati mesta koja nedostaju ili urediti mapu direktno iz Universal Maps.
+
+<b>TAMNI REŽIM:</b> Prebacite se na tamnu temu za udobno korišćenje noću.
+
+Isprobajte aplikaciju — 100% je besplatna, bez reklama, brza i potpuno offline.
+
+Universal Maps je nezavisan projekat otvorenog koda koji razvija zajednica — stotine saradnika pomažu u razvoju novih funkcija, rešavanju problema, prevođenju i unapređivanju projekta.
+
+Saznajte druge načine da podržite projekat: https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsApp

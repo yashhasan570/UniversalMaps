@@ -1,0 +1,54 @@
+typedef NS_ENUM(NSInteger, MWMActionBarButtonType) {
+  MWMActionBarButtonTypeBookmark,
+  MWMActionBarButtonTypeTrack,
+  MWMActionBarButtonTypeSaveTrackRecording,
+  MWMActionBarButtonTypeDeleteTrackRecording,
+  MWMActionBarButtonTypeCall,
+  MWMActionBarButtonTypeDownload,
+  MWMActionBarButtonTypeMore,
+  MWMActionBarButtonTypeRouteAddStop,
+  MWMActionBarButtonTypeRouteReplaceStop,
+  MWMActionBarButtonTypeRouteFrom,
+  MWMActionBarButtonTypeRouteRemoveStop,
+  MWMActionBarButtonTypeRouteTo,
+  MWMActionBarButtonTypeAvoidToll,
+  MWMActionBarButtonTypeAvoidDirty,
+  MWMActionBarButtonTypeAvoidFerry,
+  MWMActionBarButtonTypeRouteAddDestination
+} NS_SWIFT_NAME(ActionBarButtonType);
+
+NS_ASSUME_NONNULL_BEGIN
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+NSString * titleForButton(MWMActionBarButtonType type, BOOL isSelected);
+#ifdef __cplusplus
+}
+#endif
+
+@class MWMActionBarButton;
+@class MWMCircularProgress;
+
+NS_SWIFT_NAME(ActionBarButtonDelegate)
+@protocol MWMActionBarButtonDelegate <NSObject>
+
+- (void)tapOnButtonWithType:(MWMActionBarButtonType)type;
+
+@end
+
+NS_SWIFT_NAME(ActionBarButton)
+@interface MWMActionBarButton : UIView
+
+@property(nonatomic, readonly) MWMActionBarButtonType type;
+@property(nonatomic, readonly, nullable) MWMCircularProgress * mapDownloadProgress;
+
++ (MWMActionBarButton *)buttonWithDelegate:(id<MWMActionBarButtonDelegate>)delegate
+                                buttonType:(MWMActionBarButtonType)type
+                                isSelected:(BOOL)isSelected
+                                 isPrimary:(BOOL)isPrimary;
+
+@end
+
+NS_ASSUME_NONNULL_END

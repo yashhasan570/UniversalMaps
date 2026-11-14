@@ -1,0 +1,60 @@
+Universal Maps iyithuluzi elishesha nelinemininingwane elisebenza ngaphandle kokuxhumeka kwe-intanethi futhi line-GPS yokuhola indlela, elenzelwe ukuhamba, ukuhamba ngezintaba, ukuhamba ngezinyawo, kanye nokugibela ibhayisikili. Hlela, uthumele, futhi urekhoda izindlela, futhi ujabulele ukuqondiswa okuhle ngaphandle kokudla ibhethri lakho noma ukusebenzisa uxhumano lwe-intanethi. Lolu hlelo lokusebenza lunikeza ukulanda kwemephu okungenamkhawulo kanye nezibuyekezo eziphindwa kabili ngenyanga. Lusekelwe ku-OpenStreetMap, lwenziwe ngabavolontiya, lugxile ekuvikelweni kwemfihlo, lusebenza ngaphandle kwe-intanethi ngokuphelele, futhi luyamahhala ngokuphelele.
+
+<b>NGAPHANDLE KWENETHIWEKI:</b>
+
+Lolu hlelo lokusebenza lusebenza ngokuphelele ngaphandle kwe-intanethi — kuhlanganisa ukusesha nokuhamba. Ungahlola imephu futhi uhambe ngaphandle kokuxhumeka ku-intanethi, ngaleyo ndlela ugcine idatha yeselula nemali yokuhamba phesheya. Futhi ngenxa yokungadluliseli idatha ngemuva kwesikrini, ibhethri lakho lihlala isikhathi eside kakhulu.
+
+<b>SHESHA:</b>
+
+Ukuzula, ukusesha, nokubala izindlela kusebenza ngokushesha okubonakalayo.
+
+<b>OKUGCWELE IMINININGWANE NOKUVUZA:</b>
+
+Amamephu agcwele imininingwane futhi avuselelwa kabili ngenyanga ukuze abonise izimo zangempela zomhlaba. Ngokungafani nabancintisana nabo abaningi abaziwayo, afaka izilabelama zokwakha, amabhentshi, izindlela zokuhamba ngezinyawo, nolunye ulwazi oluwusizo.
+
+<b>IMFIHLO KUZA KUQALA:</b>
+
+Asiqoqi idatha noma izazisi. Lokhu kusho ukuthi akukho ngozi yokuvuza kwedatha futhi akukho ukuphazamiseka okufana nezikhangiso noma izaziso ezinesasaza — isipiliyoni semephu esihlanzekile, esizimele.
+
+<b>IZICI EZIBALULEKILE</b>
+
+<b>HLOLA IZINDAWO:</b>
+
+Sesha ngokwekheli, igama, noma isigaba, thola izigidi zama-POI, futhi ubone imininingwane eningiliziwe efana namahora okuvula, izihloko ze-Wikipedia, ukufinyeleleka kwesihlalo esinesondo, nezinye imininingwane ewusizo.
+
+<b>UKUZULAZULA NGE-GPS:</b>
+
+Jabulela imiyalelo eqondiswa ngamazwi, okujika ngokujika. Dala imizila yokuhamba ngezinyawo, yokuhamba entabeni, yokugibela ibhayisikili, noma yokushayela — kuhlanganisa nemizila phakathi kwamadolobha, amazwe, nezindawo eziningi zokuma. I-Android Auto iyasekelwa.
+
+<b>IZINDLELA ZOKUHAMBA NGEZINYAWO NANGEBHAYISIKILI EMHLABENI WONKE:</b>
+
+Vumela izendlalelo zemephu ezikhethekile ukuze uthole izindlela ezidume kakhulu zokuhamba ngezinyawo nokugibela ibhayisikili emhlabeni wonke, zonke zithathwe ku-OpenStreetMap. Shintsha phakathi kwezendlalelo ukuze ubone imigqa enemibala yamabhayisikili ne-MTB, kanye nemizila esemthethweni yokuhamba ngezinyawo.
+
+<b>ISIMO SEZWE SE-3D NOKUJULA:</b>
+
+Bona ukuphakama kwezintaba, ukujula kwezilwandle, kanye nemigqa yokuphakama enemininingwane. Thepha noma kuphi emephini ukuze ubone ukuphakama.
+
+<b>EZOKUTHUTHA ZOMPHAKATHI:</b>
+
+Hlela imizila yezithuthi zomphakathi. Amashadi wesikhathi abukhoma asathuthukiswa.
+
+<b>IZITAYELA ZEMEPHU:</b>
+
+Khetha izendlalelo zemephu ezifanele umsebenzi wakho — Ngaphandle, Imigqa Yemibimbi, Ukuhamba Ngezinyawo, Ukugibela Ibhayisikili, noma iMetro/Isitimela Esingaphansi Komhlaba.
+
+<b>UMREKHODI WOMZILA:</b>
+
+Rekhoda, ngena, thumela ngaphandle, futhi wabelane ngezindlela zakho nezindawo ozithandayo. Isekela amafomethi e-KML, KMZ, GPX, ne-GeoJSON.
+
+<b>IZIHLOKO ZE-WIKIPEDIA:</b> Hlola izihloko ze-Wikipedia zezindawo ozithola emephini. Thayipha “?wiki” ekusesheni ukuze uthole zonke izindawo ezinezihloko ze-Wikipedia.
+
+<b>UMHLELI WEMEPHU:</b> Nika umnikelo ku-OpenStreetMap ngokwengeza izindawo ezingekho noma ngokuhlela imephu ngqo kusuka ku-Universal Maps.
+
+<b>IMODI EMNYAMA:</b> Shintsha uye kutimu emnyama ukuze ukubuka kube khululekile ebusuku.
+
+Noma ufunde ezinye izindlela zokusekela iphrojekthi: https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Imibono yakho eqotho nezibuyekezo esitolo ziyasikhuthaza! Sithokozela ukuzwa kuwe lapho.
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsApp

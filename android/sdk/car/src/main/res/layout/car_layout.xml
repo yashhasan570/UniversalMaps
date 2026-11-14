@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <com.universalmaps.app.sdk.MapView
+      android:id="@+id/map_view"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      app:display_type="car" />
+
+  <FrameLayout
+      android:id="@+id/visible_area_container"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:layout_gravity="top|start">
+
+    <com.universalmaps.app.sdk.widgets.speedlimit.CombinedSpeedView
+        android:id="@+id/speed_limit_view"
+        android:layout_width="70dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="4dp"
+        app:om_widget_current_speed_position="bottom" />
+  </FrameLayout>
+
+</FrameLayout>

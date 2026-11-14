@@ -1,0 +1,82 @@
+ext.Publish = { Project project, Map<String, Object> props ->
+  def artifact = rootProject.ext.sdkArtifacts[project.path]
+  if (artifact == null) throw new GradleException("Unregistered SDK publication: ${project.path}")
+  apply plugin: 'com.vanniktech.maven.publish'
+  apply plugin: 'com.gradleup.nmcp'
+
+  publishing {
+    repositories {
+      maven {
+        name = 'SdkCheck'
+        url = rootProject.layout.buildDirectory.dir('sdk-check/repository')
+      }
+    }
+  }
+
+  android {
+    defaultConfig {
+      aarMetadata {
+        minCompileSdk = propCompileSdkVersion.toInteger()
+      }
+    }
+  }
+
+  mavenPublishing {
+    coordinates('com.universalmaps.app.sdk', artifact, rootProject.ext.sdkVersion)
+
+    // Sign only when a key is configured; local tasks (e.g. publishToMavenLocal) run without one.
+    if (project.findProperty('signingInMemoryKey') != null) {
+      signAllPublications()
+    }
+
+    pom {
+      name = props['name']
+      description = props['description']
+      url = 'https://github.com/universalmaps/universalmaps'
+      inceptionYear = '2026'
+
+      licenses {
+        license {
+          name = 'The Apache License, Version 2.0'
+          url = 'https://github.com/universalmaps/universalmaps/blob/master/LICENSE'
+          distribution = 'repo'
+        }
+        license {
+          name = 'Universal Maps Binary Data License'
+          url = 'https://github.com/universalmaps/universalmaps/blob/master/DATA_LICENSE.txt'
+          distribution = 'repo'
+        }
+      }
+
+      organization {
+        name = 'Universal Maps'
+        url = 'https://github.com/yashhasan570/UniversalMaps'
+      }
+
+      developers {
+        developer {
+          id = 'UniversalMaps'
+          name = 'Universal Maps Team'
+          email = 'sdk@universalmaps.app'
+          organizationUrl = 'https://github.com/yashhasan570/UniversalMaps'
+        }
+      }
+
+      scm {
+        connection = 'scm:git:https://github.com/universalmaps/universalmaps.git'
+        developerConnection = 'scm:git:ssh://git@github.com/universalmaps/universalmaps.git'
+        url = 'https://github.com/universalmaps/universalmaps'
+      }
+
+      ciManagement {
+        system = 'GitHub Actions'
+        url = 'https://github.com/universalmaps/universalmaps/actions'
+      }
+
+      issueManagement {
+        system = 'GitHub Issues'
+        url = 'https://github.com/universalmaps/universalmaps/issues'
+      }
+    }
+  }
+}

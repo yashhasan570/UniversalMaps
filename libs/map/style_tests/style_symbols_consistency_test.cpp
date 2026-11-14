@@ -1,0 +1,126 @@
+#include "testing/testing.hpp"
+
+#include "map/style_tests/helpers.hpp"
+
+#include "indexer/drawing_rules.hpp"
+#include "indexer/map_style_reader.hpp"
+
+#include "base/logging.hpp"
+
+#include "coding/parse_xml.hpp"
+#include "coding/reader.hpp"
+
+#include <cstring>  // std::strcmp
+#include <set>
+#include <string>
+#include <vector>
+
+namespace style_symbols_consistency_tests
+{
+typedef std::set<std::string> StringSet;
+
+class SymbolsXmlParsingDispatcher
+{
+public:
+  explicit SymbolsXmlParsingDispatcher(StringSet & symbols) : m_symbols(symbols) {}
+
+  bool Push(char const *) { return true; }
+  void Pop(char const *) {}
+  void CharData(std::string const &) {}
+  void AddAttr(char const * attribute, char const * value)
+  {
+    if (0 == std::strcmp(attribute, "name"))
+      m_symbols.insert(value);
+  }
+
+private:
+  StringSet & m_symbols;
+};
+
+StringSet GetSymbolsSetFromDrawingRule()
+{
+  StringSet symbols;
+  drule::GetCurrentRules().ForEachRule([&symbols](drule::BaseRule const * rule)
+  {
+    drule::SymbolRule const * symbol = rule->GetSymbol();
+    if (symbol && !symbol->name.empty())
+      symbols.insert(symbol->name);
+  });
+  return symbols;
+}
+
+StringSet GetSymbolsSetFromResourcesFile(std::string_view density)
+{
+  StringSet symbols;
+  SymbolsXmlParsingDispatcher dispatcher(symbols);
+  ReaderPtr<Reader> reader = GetStyleReader().GetResourceReader("symbols.xml", density);
+  ReaderSource<ReaderPtr<Reader>> source(reader);
+  ParseXML(source, dispatcher);
+  return symbols;
+}
+
+// Tests that all symbols specified in drawing rules have corresponding symbols in resources
+UNIT_TEST(Test_SymbolsConsistency)
+{
+  bool res = true;
+
+  std::string_view constexpr densities[] = {"mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi", "6plus"};
+
+  styles::RunForEveryMapStyle([&](MapStyle mapStyle)
+  {
+    StringSet const drawingRuleSymbols = GetSymbolsSetFromDrawingRule();
+
+    for (std::string_view density : densities)
+    {
+      StringSet const resourceStyles = GetSymbolsSetFromResourcesFile(density);
+
+      std::vector<std::string> missed;
+      std::set_difference(drawingRuleSymbols.begin(), drawingRuleSymbols.end(), resourceStyles.begin(),
+                          resourceStyles.end(), back_inserter(missed));
+
+      if (!missed.empty())
+      {
+        // We are interested in all set of bugs, therefore we do not stop test here but
+        // continue it just keeping in res that test failed.
+        LOG(LINFO, ("Symbols mismatch: style", mapStyle, ", density", density, ", missed", missed));
+        res = false;
+      }
+    }
+  });
+
+  TEST(res, ());
+}
+
+// The code requests named colors by name and a missing one aborts in Debug, so all styles must define the
+// same names. The merged style is skipped: it is a tools-only mix of the others.
+UNIT_TEST(Test_NamedColorsConsistency)
+{
+  // The vehicle styles draw no isolines (see terrain::IsolinesStyle).
+  StringSet const kIsolineColors = {"IsolineDepth", "IsolineDepthText"};
+
+  auto const getNames = [](MapStyle mapStyle)
+  {
+    StringSet names;
+    for (auto const & color : drule::DecodeRules(mapStyle).namedColors)
+      names.insert(color.name);
+    return names;
+  };
+
+  StringSet const expected = getNames(kDefaultMapStyle);
+  TEST(!expected.empty(), ());
+  for (size_t s = 0; s < MapStyleCount; ++s)
+  {
+    MapStyle const mapStyle = static_cast<MapStyle>(s);
+    if (mapStyle == MapStyleMerged)
+      continue;
+
+    // Report just the differing names: every style defines about a hundred of them.
+    StringSet names = getNames(mapStyle);
+    if (mapStyle == MapStyleVehicleLight || mapStyle == MapStyleVehicleDark)
+      names.insert(kIsolineColors.begin(), kIsolineColors.end());
+    std::vector<std::string> diff;
+    std::set_symmetric_difference(names.begin(), names.end(), expected.begin(), expected.end(), back_inserter(diff));
+    TEST(diff.empty(), (mapStyle, "named colors differ:", diff));
+  }
+}
+}  // namespace style_symbols_consistency_tests

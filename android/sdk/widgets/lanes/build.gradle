@@ -1,0 +1,23 @@
+plugins {
+  id 'com.android.library'
+}
+
+apply from: "${rootProject.rootDir}/groovy/common-config.gradle"
+apply from: "${rootProject.rootDir}/groovy/publishing.gradle"
+
+android {
+  namespace 'com.universalmaps.app.sdk.widgets.lanes'
+  // enableKotlin = true  // see app/build.gradle
+}
+
+dependencies {
+  api project(':sdk')
+
+  implementation libs.androidx.annotation
+  implementation libs.androidx.appcompat
+}
+
+Publish(project, [
+    'name'       : 'Universal Maps SDK. Lanes widget',
+    'description': 'A library that provides a lanes widget for the Universal Maps SDK'
+])

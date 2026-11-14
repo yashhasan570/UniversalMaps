@@ -1,0 +1,76 @@
+#pragma once
+
+#include "shaders/programs.hpp"
+
+#include "drape/pointers.hpp"
+#include "drape/render_state.hpp"
+
+#include <cstdint>
+
+namespace df
+{
+enum class DepthLayer : uint8_t
+{
+  // Keep kStateExtensions in sync with this order.
+  GeometryLayer = 0,
+  Geometry3dLayer,
+  UserLineLayer,
+  MwmBorderLayer,
+  OverlayLayer,
+  TransitSchemeLayer,
+  UserMarkLayer,
+  RoutingBottomMarkLayer,
+  RoutingMarkLayer,
+  /// @todo Rename SearchMarkLayer since it holds:
+  /// - non-displacing search marks
+  /// - displacing (with each others only) Bookmark titles
+  SearchMarkLayer,
+  GuiLayer,
+  // Drawn right after UserLineLayer, see FrontendRenderer::RenderScene().
+  SelectedUserLineLayer,
+  // The render order is set in FrontendRenderer::RenderScene, which draws this layer under UserLineLayer.
+  UserAreaLayer,
+  LayersCount
+};
+
+/// @todo Replace with simple struct without polymorphism.
+class RenderStateExtension : public dp::BaseRenderStateExtension
+{
+public:
+  explicit RenderStateExtension(DepthLayer depthLayer);
+
+  bool Less(ref_ptr<dp::BaseRenderStateExtension> other) const override;
+  bool Equal(ref_ptr<dp::BaseRenderStateExtension> other) const override;
+
+  DepthLayer GetDepthLayer() const { return m_depthLayer; }
+
+private:
+  DepthLayer const m_depthLayer;
+};
+
+extern DepthLayer GetDepthLayer(dp::RenderState const & state);
+extern dp::RenderState CreateRenderState(gpu::Program program, DepthLayer depthLayer);
+
+inline std::string DebugPrint(DepthLayer layer)
+{
+  switch (layer)
+  {
+  case DepthLayer::GeometryLayer: return "GeometryLayer";
+  case DepthLayer::Geometry3dLayer: return "Geometry3dLayer";
+  case DepthLayer::UserLineLayer: return "UserLineLayer";
+  case DepthLayer::MwmBorderLayer: return "MwmBorderLayer";
+  case DepthLayer::OverlayLayer: return "OverlayLayer";
+  case DepthLayer::TransitSchemeLayer: return "TransitSchemeLayer";
+  case DepthLayer::UserMarkLayer: return "UserMarkLayer";
+  case DepthLayer::RoutingBottomMarkLayer: return "RoutingBottomMarkLayer";
+  case DepthLayer::RoutingMarkLayer: return "RoutingMarkLayer";
+  case DepthLayer::SearchMarkLayer: return "SearchMarkLayer";
+  case DepthLayer::GuiLayer: return "GuiLayer";
+  case DepthLayer::SelectedUserLineLayer: return "SelectedUserLineLayer";
+  case DepthLayer::UserAreaLayer: return "UserAreaLayer";
+  case DepthLayer::LayersCount: CHECK(false, ("Try to output LayersCount"));
+  }
+  CHECK(false, ("Unknown layer"));
+  return {};
+}
+}  // namespace df

@@ -1,0 +1,179 @@
+package com.universalmaps.app.car.screens.download;
+
+import androidx.annotation.NonNull;
+import androidx.car.app.CarContext;
+import androidx.car.app.constraints.ConstraintManager;
+import androidx.car.app.model.Action;
+import androidx.car.app.model.Header;
+import androidx.car.app.model.MessageTemplate;
+import androidx.car.app.model.Template;
+import androidx.lifecycle.LifecycleOwner;
+import com.universalmaps.app.car.R;
+import com.universalmaps.app.car.screens.ErrorScreen;
+import com.universalmaps.app.downloader.ErrorCodeHelper;
+import com.universalmaps.app.sdk.UniversalMaps;
+import com.universalmaps.app.sdk.car.screens.BaseScreen;
+import com.universalmaps.app.sdk.downloader.CountryItem;
+import com.universalmaps.app.sdk.downloader.MapManager;
+import com.universalmaps.app.sdk.util.StringUtils;
+import com.universalmaps.app.sdk.util.concurrency.UiThread;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+class DownloaderScreen extends BaseScreen
+{
+  @NonNull
+  private final Set<String> mMissingMaps;
+  @NonNull
+  private final String[] mMaps;
+  private final boolean mIsCancelActionDisabled;
+  private final boolean mIsAppRefreshEnabled;
+  private final boolean mWithTerrain;
+
+  private int mSubscriptionSlot = 0;
+  private boolean mIsDownloadFailed = false;
+
+  @NonNull
+  private final MapManager.StorageCallback mStorageCallback = new MapManager.StorageCallback() {
+    @Override
+    public void onStatusChanged(@NonNull final List<MapManager.StorageCallbackData> data)
+    {
+      for (final MapManager.StorageCallbackData item : data)
+      {
+        if (!mMissingMaps.contains(item.countryId))
+          continue;
+
+        // Terrain may continue or fail in the background once the map is usable.
+        if (MapManager.nativeHasLatestVersion(item.countryId))
+          mMissingMaps.remove(item.countryId);
+        else if (item.newStatus == CountryItem.STATUS_FAILED)
+        {
+          onError(item);
+          return;
+        }
+      }
+
+      if (mMissingMaps.isEmpty())
+      {
+        setResult(true);
+        UiThread.runLater(DownloaderScreen.this::finish);
+      }
+      else
+        invalidate();
+    }
+
+    @Override
+    public void onProgress(String countryId, MapManager.Progress progress)
+    {
+      if (progress.mwmTotal == 0)
+        return;
+
+      if (!mIsAppRefreshEnabled)
+        return;
+
+      if (mMissingMaps.contains(countryId))
+        invalidate();
+    }
+  };
+
+  DownloaderScreen(@NonNull final CarContext carContext, @NonNull UniversalMaps universalMapsContext,
+                   @NonNull final List<CountryItem> missingMaps, final boolean isCancelActionDisabled,
+                   final boolean withTerrain)
+  {
+    super(carContext, universalMapsContext);
+    setMarker(DownloadMapsScreen.MARKER);
+    setResult(false);
+
+    MapManager.nativeEnableDownloadOn3g();
+
+    mMissingMaps = new HashSet<>();
+    for (final CountryItem item : missingMaps)
+      mMissingMaps.add(item.id);
+    mMaps = mMissingMaps.toArray(new String[0]);
+    mIsCancelActionDisabled = isCancelActionDisabled;
+    mWithTerrain = withTerrain;
+    mIsAppRefreshEnabled = carContext.getCarService(ConstraintManager.class).isAppDrivenRefreshEnabled();
+  }
+
+  @Override
+  public void onResume(@NonNull LifecycleOwner owner)
+  {
+    super.onResume(owner);
+    mMissingMaps.removeIf(MapManager::nativeHasLatestVersion);
+    if (mMissingMaps.isEmpty())
+    {
+      setResult(true);
+      UiThread.runLater(this::finish);
+      return;
+    }
+    if (mSubscriptionSlot == 0)
+      mSubscriptionSlot = MapManager.nativeSubscribe(mStorageCallback);
+    MapManager.startDownload(mMissingMaps.toArray(new String[0]), mWithTerrain);
+  }
+
+  @Override
+  public void onPause(@NonNull LifecycleOwner owner)
+  {
+    super.onPause(owner);
+    if (!mIsDownloadFailed)
+      cancelMapsDownloading();
+    if (mSubscriptionSlot != 0)
+    {
+      MapManager.nativeUnsubscribe(mSubscriptionSlot);
+      mSubscriptionSlot = 0;
+    }
+  }
+
+  @NonNull
+  @Override
+  protected Template onGetTemplateImpl()
+  {
+    final MessageTemplate.Builder builder = new MessageTemplate.Builder(getText());
+    builder.setLoading(true);
+
+    final Header.Builder headerBuilder = new Header.Builder();
+    if (mIsCancelActionDisabled)
+      headerBuilder.setStartHeaderAction(Action.APP_ICON);
+    else
+      headerBuilder.setStartHeaderAction(Action.BACK);
+    headerBuilder.setTitle(getCarContext().getString(R.string.notification_channel_downloader));
+    builder.setHeader(headerBuilder.build());
+
+    return builder.build();
+  }
+
+  @NonNull
+  private String getText()
+  {
+    if (!mIsAppRefreshEnabled)
+      return getCarContext().getString(R.string.downloader_loading_ios);
+
+    // The screen finishes with the maps, so terrain bytes would keep it short of 100%.
+    final long[] progress = MapManager.getOverallProgressBytes(mMaps);
+    final double fraction = progress[1] == 0 ? 0 : (double) progress[0] / progress[1];
+    final String progressPercent = StringUtils.formatPercent(fraction, true);
+    final String totalSizeStr = StringUtils.getFileSizeString(getCarContext(), progress[1]);
+    final String downloadedSizeStr = StringUtils.getFileSizeString(getCarContext(), progress[0]);
+
+    return progressPercent + "\n" + downloadedSizeStr + " / " + totalSizeStr;
+  }
+
+  private void onError(@NonNull final MapManager.StorageCallbackData data)
+  {
+    mIsDownloadFailed = true;
+    final ErrorScreen.Builder builder = new ErrorScreen.Builder(getCarContext(), getUniversalMapsContext())
+                                            .setTitle(R.string.country_status_download_failed)
+                                            .setErrorMessage(ErrorCodeHelper.getErrorCodeStrRes(data.errorCode))
+                                            .setPositiveButton(R.string.downloader_retry, null);
+    if (!mIsCancelActionDisabled)
+      builder.setNegativeButton(R.string.cancel, this::finish);
+    getScreenManager().push(builder.build());
+  }
+
+  private void cancelMapsDownloading()
+  {
+    for (final String map : mMissingMaps)
+      MapManager.cancel(map, mWithTerrain);
+  }
+}

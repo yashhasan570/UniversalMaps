@@ -1,0 +1,380 @@
+package com.universalmaps.app.car.screens;
+
+import static android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE;
+import static android.text.Spanned.SPAN_INCLUSIVE_INCLUSIVE;
+
+import android.content.Intent;
+import android.net.Uri;
+import android.text.SpannableString;
+import android.text.TextUtils;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.car.app.CarContext;
+import androidx.car.app.CarToast;
+import androidx.car.app.model.Action;
+import androidx.car.app.model.CarIcon;
+import androidx.car.app.model.DistanceSpan;
+import androidx.car.app.model.DurationSpan;
+import androidx.car.app.model.ForegroundCarColorSpan;
+import androidx.car.app.model.Header;
+import androidx.car.app.model.Pane;
+import androidx.car.app.model.PaneTemplate;
+import androidx.car.app.model.Row;
+import androidx.car.app.model.Template;
+import androidx.car.app.navigation.model.MapWithContentTemplate;
+import androidx.core.graphics.drawable.IconCompat;
+import androidx.lifecycle.LifecycleOwner;
+import com.universalmaps.app.car.R;
+import com.universalmaps.app.car.screens.download.DownloadMapsScreenBuilder;
+import com.universalmaps.app.car.screens.settings.DrivingOptionsScreen;
+import com.universalmaps.app.car.util.Colors;
+import com.universalmaps.app.car.util.UiHelpers;
+import com.universalmaps.app.routing.ResultCodesHelper;
+import com.universalmaps.app.sdk.Framework;
+import com.universalmaps.app.sdk.UniversalMaps;
+import com.universalmaps.app.sdk.Router;
+import com.universalmaps.app.sdk.bookmarks.data.MapObject;
+import com.universalmaps.app.sdk.bookmarks.data.Metadata;
+import com.universalmaps.app.sdk.car.OnBackPressedCallback;
+import com.universalmaps.app.sdk.car.RoutingHelpers;
+import com.universalmaps.app.sdk.car.renderer.Renderer;
+import com.universalmaps.app.sdk.car.screens.BaseMapScreen;
+import com.universalmaps.app.sdk.routing.RoutingController;
+import com.universalmaps.app.sdk.routing.RoutingInfo;
+import com.universalmaps.app.sdk.util.Config;
+import java.util.Objects;
+
+public class PlaceScreen extends BaseMapScreen implements OnBackPressedCallback.Callback, RoutingController.Container
+{
+  public static final Router ROUTER = Router.Vehicle;
+
+  @Nullable
+  private MapObject mMapObject;
+
+  @NonNull
+  private final RoutingController mRoutingController;
+
+  @NonNull
+  private final OnBackPressedCallback mOnBackPressedCallback;
+
+  private final boolean mIsDebug;
+
+  private PlaceScreen(@NonNull Builder builder)
+  {
+    super(builder.mCarContext, builder.mUniversalMapsContext, builder.mSurfaceRenderer);
+    mMapObject = builder.mMapObject;
+    mRoutingController = RoutingController.get();
+    mOnBackPressedCallback = new OnBackPressedCallback(getCarContext(), this);
+    mIsDebug = builder.mIsDebug;
+  }
+
+  @NonNull
+  @Override
+  protected Template onGetTemplateImpl()
+  {
+    final MapWithContentTemplate.Builder builder = new MapWithContentTemplate.Builder();
+    builder.setMapController(UiHelpers.createMapController(getCarContext(), getSurfaceRenderer(), getLocationHelper()));
+    builder.setActionStrip(UiHelpers.createSettingsActionStrip(this, getSurfaceRenderer()));
+    builder.setContentTemplate(createPaneTemplate());
+    return builder.build();
+  }
+
+  @Override
+  public void onCreate(@NonNull LifecycleOwner owner)
+  {
+    super.onCreate(owner);
+    if (mRoutingController.isNavigating() && mRoutingController.getLastRouterType() == ROUTER)
+    {
+      showNavigation(true);
+      return;
+    }
+
+    mRoutingController.attach(this);
+    if (mMapObject == null)
+      mRoutingController.restoreRoute();
+    else
+    {
+      final boolean isPlanningMode = mRoutingController.isPlanning();
+      final boolean hasIncorrectEndPoint =
+          isPlanningMode && (!MapObject.same(mMapObject, mRoutingController.getEndPoint()));
+      final boolean hasIncorrectRouterType = mRoutingController.getLastRouterType() != ROUTER;
+      if (hasIncorrectRouterType)
+      {
+        mRoutingController.setRouterType(ROUTER);
+        if (isPlanningMode)
+          mRoutingController.rebuildLastRoute();
+        else
+          mRoutingController.prepare(getLocationHelper().getMyPosition(), mMapObject);
+      }
+      else if (hasIncorrectEndPoint || !isPlanningMode)
+      {
+        mRoutingController.prepare(getLocationHelper().getMyPosition(), mMapObject);
+      }
+    }
+  }
+
+  @Override
+  public void onResume(@NonNull LifecycleOwner owner)
+  {
+    super.onResume(owner);
+    mRoutingController.attach(this);
+    mRoutingController.restore();
+  }
+
+  @Override
+  public void onDestroy(@NonNull LifecycleOwner owner)
+  {
+    super.onDestroy(owner);
+    if (mRoutingController.isPlanning())
+      mRoutingController.onSaveState(this);
+    mRoutingController.detach(this);
+  }
+
+  @NonNull
+  private Header createHeader()
+  {
+    final Header.Builder builder = new Header.Builder();
+    builder.setStartHeaderAction(Action.BACK);
+    getCarContext().getOnBackPressedDispatcher().addCallback(this, mOnBackPressedCallback);
+    builder.addEndHeaderAction(createDrivingOptionsAction());
+    return builder.build();
+  }
+
+  @NonNull
+  private PaneTemplate createPaneTemplate()
+  {
+    final PaneTemplate.Builder builder = new PaneTemplate.Builder(createPane());
+    builder.setHeader(createHeader());
+    return builder.build();
+  }
+
+  @NonNull
+  private Pane createPane()
+  {
+    final Pane.Builder builder = new Pane.Builder();
+    final RoutingInfo routingInfo = Framework.nativeGetRouteFollowingInfo();
+
+    if (routingInfo == null && !mRoutingController.isErrorEncountered())
+    {
+      builder.setLoading(true);
+      return builder.build();
+    }
+
+    builder.addRow(getPlaceDescription());
+    if (routingInfo != null)
+      builder.addRow(getPlaceRouteInfo(routingInfo));
+
+    final Row placeOpeningHours =
+        UiHelpers.getPlaceOpeningHoursRow(Objects.requireNonNull(mMapObject), getCarContext());
+    if (placeOpeningHours != null)
+      builder.addRow(placeOpeningHours);
+
+    createPaneActions(builder);
+
+    return builder.build();
+  }
+
+  @NonNull
+  private Row getPlaceDescription()
+  {
+    Objects.requireNonNull(mMapObject);
+
+    final Row.Builder builder = new Row.Builder();
+    builder.setTitle(mMapObject.getTitle());
+    if (!mMapObject.getPreviewSubtitle().isEmpty())
+      builder.addText(mMapObject.getPreviewSubtitle());
+    String address = mMapObject.getAddress();
+    if (address.isEmpty())
+      address = Framework.nativeGetAddress(mMapObject.getLat(), mMapObject.getLon());
+    if (!address.isEmpty())
+      builder.addText(address);
+    return builder.build();
+  }
+
+  @NonNull
+  private Row getPlaceRouteInfo(@NonNull RoutingInfo routingInfo)
+  {
+    final Row.Builder builder = new Row.Builder();
+
+    final SpannableString time = new SpannableString(" ");
+    time.setSpan(DurationSpan.create(routingInfo.totalTimeInSeconds), 0, 1, SPAN_INCLUSIVE_INCLUSIVE);
+    builder.setTitle(time);
+
+    final SpannableString distance = new SpannableString(" ");
+    distance.setSpan(DistanceSpan.create(RoutingHelpers.createDistance(routingInfo.distToTarget)), 0, 1,
+                     SPAN_INCLUSIVE_INCLUSIVE);
+    distance.setSpan(ForegroundCarColorSpan.create(Colors.DISTANCE), 0, 1, SPAN_EXCLUSIVE_EXCLUSIVE);
+    builder.addText(distance);
+
+    return builder.build();
+  }
+
+  private void createPaneActions(@NonNull Pane.Builder builder)
+  {
+    Objects.requireNonNull(mMapObject);
+
+    final String phones = mMapObject.getMetadata(Metadata.MetadataType.FMD_PHONE_NUMBER);
+    if (!TextUtils.isEmpty(phones))
+    {
+      final String phoneNumber = phones.split(";", 1)[0];
+      final Action.Builder openDialBuilder = new Action.Builder();
+      openDialBuilder.setIcon(
+          new CarIcon.Builder(IconCompat.createWithResource(getCarContext(), R.drawable.ic_phone)).build());
+      openDialBuilder.setOnClickListener(
+          () -> getCarContext().startCarApp(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phoneNumber))));
+      builder.addAction(openDialBuilder.build());
+    }
+
+    if (!mRoutingController.isBuilt())
+      return;
+
+    final Action.Builder startRouteBuilder = new Action.Builder();
+    startRouteBuilder.setBackgroundColor(Colors.START_NAVIGATION);
+    startRouteBuilder.setFlags(Action.FLAG_DEFAULT);
+    startRouteBuilder.setTitle(getCarContext().getString(R.string.p2p_start));
+    startRouteBuilder.setIcon(
+        new CarIcon.Builder(IconCompat.createWithResource(getCarContext(), R.drawable.ic_follow_and_rotate)).build());
+    startRouteBuilder.setOnClickListener(() -> {
+      Config.acceptRoutingDisclaimer();
+      mRoutingController.start();
+    });
+
+    builder.addAction(startRouteBuilder.build());
+  }
+
+  @NonNull
+  private Action createDrivingOptionsAction()
+  {
+    return new Action.Builder()
+        .setIcon(new CarIcon.Builder(IconCompat.createWithResource(getCarContext(), R.drawable.ic_settings)).build())
+        .setOnClickListener(
+            ()
+                -> getScreenManager().pushForResult(
+                    new DrivingOptionsScreen(getCarContext(), getUniversalMapsContext(), getSurfaceRenderer()),
+                    this::onDrivingOptionsResult))
+        .build();
+  }
+
+  private void onDrivingOptionsResult(@Nullable Object result)
+  {
+    if (result == null || result != DrivingOptionsScreen.DRIVING_OPTIONS_RESULT_CHANGED)
+      return;
+
+    // Driving Options changed. Let's rebuild the route
+    mRoutingController.rebuildLastRoute();
+  }
+
+  @Override
+  public void onBackPressed()
+  {
+    mRoutingController.cancel();
+  }
+
+  @Override
+  public void showNavigation(boolean show)
+  {
+    if (show)
+    {
+      getScreenManager().popToRoot();
+      getScreenManager().push(
+          new NavigationScreen.Builder(getCarContext(), getUniversalMapsContext(), getSurfaceRenderer())
+              .setDebugMode(mIsDebug)
+              .build());
+    }
+  }
+
+  @Override
+  public void onBuiltRoute()
+  {
+    Framework.nativeDeactivateMapSelectionCircle(true);
+    mMapObject = mRoutingController.getEndPoint();
+    invalidate();
+  }
+
+  @Override
+  public void onPlanningCancelled()
+  {
+    Framework.nativeDeactivateMapSelectionCircle(true);
+  }
+
+  @Override
+  public void onCommonBuildError(int lastResultCode, @NonNull String[] lastMissingMaps)
+  {
+    // Saved route points are loaded after this screen is created.
+    if (mMapObject == null)
+      mMapObject = Objects.requireNonNull(mRoutingController.getEndPoint());
+    if (ResultCodesHelper.isDownloadable(lastResultCode, lastMissingMaps.length))
+      getScreenManager().pushForResult(
+          new DownloadMapsScreenBuilder(getCarContext(), getUniversalMapsContext())
+              .setDownloaderType(DownloadMapsScreenBuilder.DownloaderType.BuildRoute)
+              .setMissingMaps(lastMissingMaps)
+              .setResultCode(lastResultCode)
+              .build(),
+          (result) -> {
+            if (Boolean.FALSE.equals(result))
+            {
+              // Declining maps for a found route only gives up a better one.
+              if (!mRoutingController.isBuilt())
+                CarToast.makeText(getCarContext(), R.string.unable_to_calc_alert_title, CarToast.LENGTH_LONG).show();
+            }
+            else
+              mRoutingController.checkAndBuildRoute();
+            invalidate();
+          });
+    else
+    {
+      CarToast.makeText(getCarContext(), R.string.unable_to_calc_alert_title, CarToast.LENGTH_LONG).show();
+      invalidate();
+    }
+  }
+
+  @Override
+  public void onDrivingOptionsBuildError()
+  {
+    onCommonBuildError(-1, new String[0]);
+  }
+
+  /**
+   * A builder of {@link PlaceScreen}.
+   */
+  public static final class Builder
+  {
+    @NonNull
+    private final CarContext mCarContext;
+    @NonNull
+    private final UniversalMaps mUniversalMapsContext;
+    @NonNull
+    private final Renderer mSurfaceRenderer;
+    @Nullable
+    private MapObject mMapObject;
+    private boolean mIsDebug;
+
+    public Builder(@NonNull final CarContext carContext, @NonNull UniversalMaps universalMapsContext,
+                   @NonNull final Renderer surfaceRenderer)
+    {
+      mCarContext = carContext;
+      mUniversalMapsContext = universalMapsContext;
+      mSurfaceRenderer = surfaceRenderer;
+    }
+
+    @NonNull
+    public Builder setMapObject(@Nullable MapObject mapObject)
+    {
+      mMapObject = mapObject;
+      return this;
+    }
+
+    @NonNull
+    public Builder setDebugMode(boolean isDebug)
+    {
+      mIsDebug = isDebug;
+      return this;
+    }
+
+    @NonNull
+    public PlaceScreen build()
+    {
+      return new PlaceScreen(this);
+    }
+  }
+}

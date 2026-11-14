@@ -1,0 +1,76 @@
+#pragma once
+
+#include <atomic>
+#include <chrono>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+
+namespace base
+{
+// This is a helper thread-safe class which can be mixed in
+// classes which represent some cancellable activities.
+class Cancellable
+{
+public:
+  enum class Status
+  {
+    Active,
+    CancelCalled,
+    DeadlineExceeded,
+  };
+
+  Cancellable() = default;
+
+  virtual ~Cancellable() {}
+
+  // Marks current activity as not cancelled.
+  // Resets the deadline if it was present.
+  virtual void Reset();
+
+  // Marks current activity as cancelled.
+  virtual void Cancel();
+
+  // Sets a deadline after which the activity is cancelled.
+  virtual void SetDeadline(std::chrono::steady_clock::time_point const & t);
+
+  // Updates the status.
+  // Returns true iff current activity has been cancelled (either by the call
+  // to Cancel or by timeout).
+  virtual bool IsCancelled() const;
+
+  // Updates the status of current activity and returns its value.
+  virtual Status CancellationStatus() const;
+
+private:
+  // Checks whether |m_deadline| has exceeded. Must be called with |m_mutex| locked.
+  void CheckDeadline() const;
+
+  mutable std::mutex m_mutex;
+
+  mutable Status m_status = Status::Active;
+
+  std::optional<std::chrono::steady_clock::time_point> m_deadline;
+};
+
+std::string DebugPrint(Cancellable::Status status);
+
+// A lock-free cancellation flag without the deadline and status of Cancellable: copies share it,
+// so another thread can set it, and a copy outlives the original. One allocation per instance,
+// copies are cheap. The relaxed ordering publishes only the flag itself, no other data.
+class SharedCancellable
+{
+public:
+  // No implicit move: a moved-from token keeps the shared flag.
+  SharedCancellable() = default;
+  SharedCancellable(SharedCancellable const &) = default;
+  SharedCancellable & operator=(SharedCancellable const &) = default;
+
+  bool IsCancelled() const { return m_cancelled->load(std::memory_order_relaxed); }
+  void Cancel() { m_cancelled->store(true, std::memory_order_relaxed); }
+
+private:
+  std::shared_ptr<std::atomic_bool> m_cancelled = std::make_shared<std::atomic_bool>(false);
+};
+}  // namespace base

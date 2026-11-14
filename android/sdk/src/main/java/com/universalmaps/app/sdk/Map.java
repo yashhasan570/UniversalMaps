@@ -1,0 +1,487 @@
+package com.universalmaps.app.sdk;
+
+import android.content.Context;
+import android.graphics.Rect;
+import android.view.MotionEvent;
+import android.view.Surface;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import com.universalmaps.app.sdk.display.DisplayType;
+import com.universalmaps.app.sdk.location.LocationHelper;
+import com.universalmaps.app.sdk.util.Assert;
+import com.universalmaps.app.sdk.util.Config;
+import com.universalmaps.app.sdk.util.ROMUtils;
+import com.universalmaps.app.sdk.util.Utils;
+import com.universalmaps.app.sdk.util.concurrency.UiThread;
+import com.universalmaps.app.sdk.util.log.Logger;
+
+/**
+ * Low-level bridge to the process-wide renderer and one display surface.
+ * Ordinary Android hosts use {@link MapView} and {@link MapController}, which forward surface and lifecycle events.
+ * Call static gesture and viewport methods on the main thread after the rendering engine exists.
+ */
+public final class Map
+{
+  /**
+   * Receives a failure to create or attach a graphics surface.
+   */
+  public interface CallbackUnsupported
+  {
+    /**
+     * Called when the surface is unsupported; show an appropriate host error UI.
+     */
+    void report();
+  }
+
+  private static final String TAG = Map.class.getSimpleName();
+
+  // Should correspond to android::MultiTouchAction from Framework.cpp
+  public static final int NATIVE_ACTION_UP = 0x01;
+  public static final int NATIVE_ACTION_DOWN = 0x02;
+  public static final int NATIVE_ACTION_MOVE = 0x03;
+  public static final int NATIVE_ACTION_CANCEL = 0x04;
+
+  // Should correspond to gui::EWidget from skin.hpp
+  public static final int WIDGET_RULER = 0x01;
+  public static final int WIDGET_COMPASS = 0x02;
+  public static final int WIDGET_COPYRIGHT = 0x04;
+  public static final int WIDGET_SCALE_FPS_LABEL = 0x08;
+
+  // Should correspond to dp::Anchor from drape_global.hpp
+  public static final int ANCHOR_CENTER = 0x00;
+  public static final int ANCHOR_LEFT = 0x01;
+  public static final int ANCHOR_RIGHT = (ANCHOR_LEFT << 1);
+  public static final int ANCHOR_TOP = (ANCHOR_RIGHT << 1);
+  public static final int ANCHOR_BOTTOM = (ANCHOR_TOP << 1);
+  public static final int ANCHOR_LEFT_TOP = (ANCHOR_LEFT | ANCHOR_TOP);
+  public static final int ANCHOR_RIGHT_TOP = (ANCHOR_RIGHT | ANCHOR_TOP);
+  public static final int ANCHOR_LEFT_BOTTOM = (ANCHOR_LEFT | ANCHOR_BOTTOM);
+  public static final int ANCHOR_RIGHT_BOTTOM = (ANCHOR_RIGHT | ANCHOR_BOTTOM);
+
+  // Should correspond to df::TouchEvent::INVALID_MASKED_POINTER from user_event_stream.cpp
+  public static final int INVALID_POINTER_MASK = 0xFF;
+  public static final int INVALID_TOUCH_ID = -1;
+
+  @NonNull
+  private final DisplayType mDisplayType;
+
+  @Nullable
+  private LocationHelper mLocationHelper;
+
+  private int mCurrentCompassOffsetX;
+  private int mCurrentCompassOffsetY;
+  private int mBottomWidgetOffsetX;
+  private int mBottomWidgetOffsetY;
+
+  private int mHeight;
+  private int mWidth;
+  private boolean mRequireResize;
+  private boolean mSurfaceCreated;
+  private boolean mSurfaceAttached;
+  private boolean mLaunchByDeepLink;
+  @Nullable
+  private MapRenderingListener mMapRenderingListener;
+  @Nullable
+  private CallbackUnsupported mCallbackUnsupported;
+
+  private static int sCurrentDpi = 0;
+
+  /**
+   * Creates a low-level surface controller for the given display type.
+   * @param mapType target display; bind location and lifecycle callbacks before creating its surface
+   */
+  public Map(@NonNull DisplayType mapType)
+  {
+    mDisplayType = mapType;
+    onCreate(false);
+  }
+
+  /**
+   * Sets the location helper used when creating the rendering engine; call before {@link #onSurfaceCreated}.
+   */
+  public void setLocationHelper(@NonNull LocationHelper locationHelper)
+  {
+    mLocationHelper = locationHelper;
+  }
+
+  /**
+   * Moves the map compass using the given offsets.
+   *
+   * @param context     Context.
+   * @param offsetX     Pixel offset from the right; negative keeps the previous value.
+   * @param offsetY     Pixel offset from the top; negative keeps the previous value.
+   * @param forceRedraw True to force the compass to redraw
+   */
+  public void updateCompassOffset(final Context context, int offsetX, int offsetY, boolean forceRedraw)
+  {
+    final int x = offsetX < 0 ? mCurrentCompassOffsetX : offsetX;
+    final int y = offsetY < 0 ? mCurrentCompassOffsetY : offsetY;
+    final int navPadding = Utils.dimen(context, R.dimen.nav_frame_padding);
+    final int marginX = Utils.dimen(context, R.dimen.margin_compass) + navPadding;
+    final int marginY = Utils.dimen(context, R.dimen.margin_compass_top) + navPadding;
+    nativeSetupWidget(WIDGET_COMPASS, mWidth - x - marginX, y + marginY, ANCHOR_CENTER);
+    if (forceRedraw && mSurfaceCreated)
+      nativeApplyWidgets();
+    mCurrentCompassOffsetX = x;
+    mCurrentCompassOffsetY = y;
+  }
+
+  /**
+   * Forwards a compass bearing in radians to the renderer; {@code forceRedraw} requests an immediate update.
+   */
+  public static void onCompassUpdated(double north, boolean forceRedraw)
+  {
+    nativeCompassUpdated(north, forceRedraw);
+  }
+
+  /**
+   * Moves the ruler and copyright using the given offsets.
+   *
+   * @param context Context.
+   * @param offsetX Pixel offset from the left; negative keeps the previous value.
+   * @param offsetY Pixel offset from the bottom; negative keeps the previous value.
+   */
+  public void updateBottomWidgetsOffset(final Context context, int offsetX, int offsetY)
+  {
+    final int x = offsetX < 0 ? mBottomWidgetOffsetX : offsetX;
+    final int y = offsetY < 0 ? mBottomWidgetOffsetY : offsetY;
+    updateRulerOffset(context, x, y);
+    updateAttributionOffset(context, x, y);
+    mBottomWidgetOffsetX = x;
+    mBottomWidgetOffsetY = y;
+  }
+
+  /**
+   * Moves my position arrow to the given offset.
+   *
+   * @param offsetY Pixel offset from the bottom.
+   */
+  public void updateMyPositionRoutingOffset(int offsetY)
+  {
+    nativeUpdateMyPositionRoutingOffset(offsetY);
+  }
+
+  /**
+   * Creates or reattaches the native engine to a surface.
+   * @param context context used to resolve widget dimensions
+   * @param surface valid surface owned by the host
+   * @param surfaceFrame surface bounds in pixels
+   * @param surfaceDpi display density in dots per inch
+   */
+  public void onSurfaceCreated(final Context context, final Surface surface, Rect surfaceFrame, int surfaceDpi)
+  {
+    Assert.debug(mLocationHelper != null, "LocationHelper must be initialized before calling onSurfaceCreated");
+
+    Logger.d(TAG, "mSurfaceCreated = " + mSurfaceCreated);
+    if (nativeIsEngineCreated())
+    {
+      if (sCurrentDpi != surfaceDpi)
+      {
+        nativeUpdateEngineDpi(surfaceDpi);
+        sCurrentDpi = surfaceDpi;
+
+        setupWidgets(context, surfaceFrame.width(), surfaceFrame.height());
+      }
+      if (!nativeAttachSurface(surface))
+      {
+        if (mCallbackUnsupported != null)
+          mCallbackUnsupported.report();
+        return;
+      }
+      mSurfaceCreated = true;
+      mSurfaceAttached = true;
+      mRequireResize = true;
+      nativeResumeSurfaceRendering();
+      return;
+    }
+
+    mRequireResize = false;
+    setupWidgets(context, surfaceFrame.width(), surfaceFrame.height());
+
+    final boolean firstStart = mLocationHelper.isInFirstRun();
+    if (!nativeCreateEngine(surface, surfaceDpi, firstStart, mLaunchByDeepLink, Config.getVersionCode(),
+                            ROMUtils.isCustomROM()))
+    {
+      if (mCallbackUnsupported != null)
+        mCallbackUnsupported.report();
+      return;
+    }
+    sCurrentDpi = surfaceDpi;
+
+    if (firstStart)
+      UiThread.runLater(mLocationHelper::onExitFromFirstRun);
+
+    mSurfaceCreated = true;
+    mSurfaceAttached = true;
+    nativeResumeSurfaceRendering();
+    if (mMapRenderingListener != null)
+      mMapRenderingListener.onRenderingCreated();
+  }
+
+  /**
+   * Updates surface dimensions and widget placement. Forward the matching {@code SurfaceHolder} event.
+   * @param context context used to resolve widget dimensions
+   * @param surface current surface
+   * @param surfaceFrame current bounds in pixels
+   * @param isSurfaceCreating whether this event belongs to initial surface creation
+   */
+  public void onSurfaceChanged(final Context context, final Surface surface, Rect surfaceFrame,
+                               boolean isSurfaceCreating)
+  {
+    Logger.d(TAG, "mSurfaceCreated = " + mSurfaceCreated);
+    if (!mSurfaceCreated || (!mRequireResize && isSurfaceCreating))
+      return;
+
+    nativeSurfaceChanged(surface, surfaceFrame.width(), surfaceFrame.height());
+
+    mRequireResize = false;
+    setupWidgets(context, surfaceFrame.width(), surfaceFrame.height());
+    nativeApplyWidgets();
+    if (mMapRenderingListener != null)
+      mMapRenderingListener.onRenderingRestored();
+  }
+
+  /**
+   * Detaches this surface; preserve graphics resources when the host is changing configuration.
+   */
+  public void onSurfaceDestroyed(boolean activityIsChangingConfigurations)
+  {
+    Logger.d(TAG, "mSurfaceCreated = " + mSurfaceCreated + ", mSurfaceAttached = " + mSurfaceAttached);
+    if (!mSurfaceCreated || !mSurfaceAttached)
+      return;
+
+    nativeDetachSurface(!activityIsChangingConfigurations);
+    mSurfaceCreated = !nativeDestroySurfaceOnDetach();
+    mSurfaceAttached = false;
+  }
+
+  /**
+   * Replaces the surface rendering listener; {@code null} releases it.
+   */
+  public void setMapRenderingListener(MapRenderingListener mapRenderingListener)
+  {
+    mMapRenderingListener = mapRenderingListener;
+  }
+
+  /**
+   * Replaces the surface-failure callback; {@code null} releases it.
+   */
+  public void setCallbackUnsupported(CallbackUnsupported callback)
+  {
+    mCallbackUnsupported = callback;
+  }
+
+  /**
+   * Resets surface widget offsets and records whether the host was launched by a map API link.
+   */
+  public void onCreate(boolean launchByDeeplink)
+  {
+    mLaunchByDeepLink = launchByDeeplink;
+    mCurrentCompassOffsetX = 0;
+    mCurrentCompassOffsetY = 0;
+    mBottomWidgetOffsetX = 0;
+    mBottomWidgetOffsetY = 0;
+  }
+
+  /**
+   * Registers the rendering-initialization callback. Forward the host lifecycle start.
+   */
+  public void onStart()
+  {
+    nativeSetRenderingInitializationFinishedListener(mMapRenderingListener);
+  }
+
+  /**
+   * Unregisters the rendering-initialization callback. Forward the host lifecycle stop.
+   */
+  public void onStop()
+  {
+    nativeSetRenderingInitializationFinishedListener(null);
+  }
+
+  public void onPause()
+  {
+    // Pause/Resume can be called without surface creation/destroy.
+    if (mSurfaceAttached)
+      nativePauseSurfaceRendering();
+  }
+
+  public void onResume()
+  {
+    // Pause/Resume can be called without surface creation/destroy.
+    if (mSurfaceAttached)
+      nativeResumeSurfaceRendering();
+  }
+
+  public boolean isContextCreated()
+  {
+    return mSurfaceCreated;
+  }
+
+  /**
+   * Scrolls the native map by the supplied horizontal and vertical pixel distances.
+   */
+  public static void onScroll(double distanceX, double distanceY)
+  {
+    Map.nativeOnScroll(distanceX, distanceY);
+  }
+
+  public static void zoomIn()
+  {
+    nativeScalePlus();
+  }
+
+  public static void zoomOut()
+  {
+    nativeScaleMinus();
+  }
+
+  /**
+   * Scales around a view-local focus point.
+   * @param factor relative scale factor, with 1 meaning no change
+   * @param focusX focus x coordinate in pixels
+   * @param focusY focus y coordinate in pixels
+   * @param isAnim whether to animate the change
+   */
+  public static void onScale(double factor, double focusX, double focusY, boolean isAnim)
+  {
+    nativeOnScale(factor, focusX, focusY, isAnim);
+  }
+
+  /**
+   * Forwards up to two touch pointers to the native engine. {@link MapView} performs this translation for hosts.
+   * @param actionType one of the {@code NATIVE_ACTION_*} constants
+   * @param event view-local Android touch event
+   * @param pointerIndex changed pointer index or {@link #INVALID_POINTER_MASK} for a move
+   */
+  public static void onTouch(int actionType, MotionEvent event, int pointerIndex)
+  {
+    if (event.getPointerCount() == 1)
+    {
+      nativeOnTouch(actionType, event.getPointerId(0), event.getX(), event.getY(), Map.INVALID_TOUCH_ID, 0, 0, 0);
+    }
+    else
+    {
+      nativeOnTouch(actionType, event.getPointerId(0), event.getX(0), event.getY(0), event.getPointerId(1),
+                    event.getX(1), event.getY(1), pointerIndex);
+    }
+  }
+
+  /**
+   * Synthesizes a tap at view-local pixel coordinates.
+   */
+  public static void onClick(float x, float y)
+  {
+    nativeOnTouch(NATIVE_ACTION_DOWN, 0, x, y, Map.INVALID_TOUCH_ID, 0, 0, 0);
+    nativeOnTouch(NATIVE_ACTION_UP, 0, x, y, Map.INVALID_TOUCH_ID, 0, 0, 0);
+  }
+
+  /**
+   * Returns whether the process-wide native renderer exists; it may outlive a particular activity or surface.
+   */
+  public static boolean isEngineCreated()
+  {
+    return nativeIsEngineCreated();
+  }
+
+  /**
+   * Executes a previously parsed map API request after the renderer is ready.
+   */
+  public static void executeMapApiRequest()
+  {
+    nativeExecuteMapApiRequest();
+  }
+
+  public DisplayType getDisplayType()
+  {
+    return mDisplayType;
+  }
+
+  private void setupWidgets(final Context context, int width, int height)
+  {
+    mHeight = height;
+    mWidth = width;
+
+    nativeCleanWidgets();
+    updateBottomWidgetsOffset(context, mBottomWidgetOffsetX, mBottomWidgetOffsetY);
+    if (mDisplayType == DisplayType.Device)
+    {
+      nativeSetupWidget(WIDGET_SCALE_FPS_LABEL, Utils.dimen(context, R.dimen.margin_base),
+                        Utils.dimen(context, R.dimen.margin_base) * 2, ANCHOR_LEFT_TOP);
+      updateCompassOffset(context, mCurrentCompassOffsetX, mCurrentCompassOffsetY, false);
+    }
+    else
+    {
+      nativeSetupWidget(WIDGET_SCALE_FPS_LABEL, (float) mWidth / 2 + Utils.dimen(context, R.dimen.margin_base) * 2,
+                        Utils.dimen(context, R.dimen.margin_base), ANCHOR_LEFT_TOP);
+      updateCompassOffset(context, mWidth, mCurrentCompassOffsetY, true);
+    }
+  }
+
+  private void updateRulerOffset(final Context context, int offsetX, int offsetY)
+  {
+    // Raise the ruler a bit above the bottom edge so it stays visible over the search bar in compact mode.
+    final int additionalOffset = Utils.dimen(context, R.dimen.ruler_additional_offset);
+    nativeSetupWidget(WIDGET_RULER, Utils.dimen(context, R.dimen.margin_ruler) + offsetX,
+                      mHeight - Utils.dimen(context, R.dimen.margin_ruler) - offsetY - additionalOffset,
+                      ANCHOR_LEFT_BOTTOM);
+    if (mSurfaceCreated)
+      nativeApplyWidgets();
+  }
+
+  private void updateAttributionOffset(final Context context, int offsetX, int offsetY)
+  {
+    nativeSetupWidget(WIDGET_COPYRIGHT, Utils.dimen(context, R.dimen.margin_ruler) + offsetX,
+                      mHeight - Utils.dimen(context, R.dimen.margin_ruler) - offsetY, ANCHOR_LEFT_BOTTOM);
+    if (mSurfaceCreated)
+      nativeApplyWidgets();
+  }
+
+  // Engine
+  private static native boolean nativeCreateEngine(Surface surface, int density, boolean firstLaunch,
+                                                   boolean isLaunchByDeepLink, int appVersionCode, boolean isCustomROM);
+
+  private static native boolean nativeIsEngineCreated();
+
+  private static native void nativeUpdateEngineDpi(int dpi);
+
+  private static native void nativeSetRenderingInitializationFinishedListener(@Nullable MapRenderingListener listener);
+
+  private static native void nativeExecuteMapApiRequest();
+
+  // Surface
+  private static native boolean nativeAttachSurface(Surface surface);
+
+  private static native void nativeDetachSurface(boolean destroySurface);
+
+  private static native void nativeSurfaceChanged(Surface surface, int w, int h);
+
+  private static native boolean nativeDestroySurfaceOnDetach();
+
+  private static native void nativePauseSurfaceRendering();
+
+  private static native void nativeResumeSurfaceRendering();
+
+  // Widgets
+  private static native void nativeApplyWidgets();
+
+  private static native void nativeCleanWidgets();
+
+  private static native void nativeUpdateMyPositionRoutingOffset(int offsetY);
+
+  private static native void nativeSetupWidget(int widget, float x, float y, int anchor);
+
+  private static native void nativeCompassUpdated(double north, boolean forceRedraw);
+
+  // Events
+  private static native void nativeScalePlus();
+
+  private static native void nativeScaleMinus();
+
+  private static native void nativeOnScroll(double distanceX, double distanceY);
+
+  private static native void nativeOnScale(double factor, double focusX, double focusY, boolean isAnim);
+
+  private static native void nativeOnTouch(int actionType, int id1, float x1, float y1, int id2, float x2, float y2,
+                                           int maskedPointer);
+}

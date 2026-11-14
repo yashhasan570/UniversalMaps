@@ -1,0 +1,110 @@
+#include "routing/route_weight.hpp"
+
+#include "routing/cross_mwm_connector.hpp"
+
+#include <type_traits>
+
+namespace
+{
+template <typename Number, typename EnableIf = std::enable_if_t<std::is_integral<Number>::value, void>>
+bool SumWillOverflow(Number lhs, Number rhs)
+{
+  if (lhs > 0)
+    return rhs > std::numeric_limits<Number>::max() - lhs;
+  if (lhs < 0)
+    return rhs < std::numeric_limits<Number>::min() - lhs;
+  return false;
+}
+}  // namespace
+
+namespace routing
+{
+
+int RouteWeight::s_AccessPenaltyS = 2 * 60 * 60;  // 2 hours
+
+double RouteWeight::ToCrossMwmWeight() const
+{
+  // Do not accumulate access-change edges into cross-mwm graph.
+  /// @todo This is not very honest, but we have thousands of enter-exit edges
+  /// in cross-mwm graph now and should filter them somehow.
+
+  if (m_numAccessChanges > 0)
+    return connector::kNoRoute;
+  return GetWeight();
+}
+
+RouteWeight RouteWeight::operator+(RouteWeight const & rhs) const
+{
+  ASSERT(!SumWillOverflow(m_numAccessChanges, rhs.m_numAccessChanges), (m_numAccessChanges, rhs.m_numAccessChanges));
+  ASSERT(!SumWillOverflow(m_numAccessConditionalPenalties, rhs.m_numAccessConditionalPenalties),
+         (m_numAccessConditionalPenalties, rhs.m_numAccessConditionalPenalties));
+
+  return RouteWeight(m_weight + rhs.m_weight, m_numAccessChanges + rhs.m_numAccessChanges,
+                     m_numAccessConditionalPenalties + rhs.m_numAccessConditionalPenalties,
+                     m_transitTime + rhs.m_transitTime);
+}
+
+RouteWeight RouteWeight::operator-(RouteWeight const & rhs) const
+{
+  ASSERT_NOT_EQUAL(m_numAccessChanges, std::numeric_limits<int8_t>::min(), ());
+  ASSERT(!SumWillOverflow(m_numAccessChanges, static_cast<int8_t>(-rhs.m_numAccessChanges)),
+         (m_numAccessChanges, -rhs.m_numAccessChanges));
+  ASSERT(!SumWillOverflow(m_numAccessConditionalPenalties, static_cast<int8_t>(-rhs.m_numAccessConditionalPenalties)),
+         (m_numAccessConditionalPenalties, -rhs.m_numAccessConditionalPenalties));
+
+  return RouteWeight(m_weight - rhs.m_weight, m_numAccessChanges - rhs.m_numAccessChanges,
+                     m_numAccessConditionalPenalties - rhs.m_numAccessConditionalPenalties,
+                     m_transitTime - rhs.m_transitTime);
+}
+
+RouteWeight & RouteWeight::operator+=(RouteWeight const & rhs)
+{
+  ASSERT(!SumWillOverflow(m_numAccessChanges, rhs.m_numAccessChanges), (m_numAccessChanges, rhs.m_numAccessChanges));
+  ASSERT(!SumWillOverflow(m_numAccessConditionalPenalties, rhs.m_numAccessConditionalPenalties),
+         (m_numAccessConditionalPenalties, rhs.m_numAccessConditionalPenalties));
+  m_weight += rhs.m_weight;
+  m_numAccessChanges += rhs.m_numAccessChanges;
+  m_numAccessConditionalPenalties += rhs.m_numAccessConditionalPenalties;
+  m_transitTime += rhs.m_transitTime;
+  return *this;
+}
+
+bool RouteWeight::operator<(RouteWeight const & rhs) const
+{
+  // Compare with the access penalties, see https://github.com/universalmaps/universalmaps/issues/1788
+  auto const w1 = GetIntegratedWeight();
+  auto const w2 = rhs.GetIntegratedWeight();
+  if (w1 != w2)
+    return w1 < w2;
+
+  // Prefer bigger transit (on public transport) time if total weights are the same.
+  return m_transitTime > rhs.m_transitTime;
+}
+
+double RouteWeight::GetIntegratedWeight() const
+{
+  double res = m_weight;
+
+  if (m_numAccessChanges)
+    res += m_numAccessChanges * s_AccessPenaltyS;
+
+  if (m_numAccessConditionalPenalties)
+    res += m_numAccessConditionalPenalties * s_AccessPenaltyS / 2;
+
+  return res;
+}
+
+std::ostream & operator<<(std::ostream & os, RouteWeight const & routeWeight)
+{
+  os << "(" << static_cast<int32_t>(routeWeight.m_numAccessChanges) << ", "
+     << static_cast<int32_t>(routeWeight.m_numAccessConditionalPenalties) << ", " << routeWeight.GetWeight() << ", "
+     << routeWeight.GetTransitTime() << ")";
+  return os;
+}
+
+RouteWeight operator*(double lhs, RouteWeight const & rhs)
+{
+  return RouteWeight(lhs * rhs.GetWeight(), rhs.m_numAccessChanges, rhs.m_numAccessConditionalPenalties,
+                     lhs * rhs.GetTransitTime());
+}
+}  // namespace routing

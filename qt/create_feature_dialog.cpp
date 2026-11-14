@@ -1,0 +1,47 @@
+#include "qt/create_feature_dialog.hpp"
+
+#include "qt/qt_common/translations.hpp"
+
+#include "editor/new_feature_categories.hpp"
+
+#include "indexer/classificator.hpp"
+
+#include "platform/localization.hpp"
+
+#include <QtWidgets/QAbstractButton>
+#include <QtWidgets/QDialogButtonBox>
+#include <QtWidgets/QListWidget>
+#include <QtWidgets/QVBoxLayout>
+
+CreateFeatureDialog::CreateFeatureDialog(QWidget * parent, osm::NewFeatureCategories const & cats) : QDialog(parent)
+{
+  QListWidget * allSortedList = new QListWidget();
+
+  for (auto const & name : cats.GetAllCreatableTypeNames())
+  {
+    auto * item = new QListWidgetItem(QString::fromStdString(platform::GetLocalizedTypeName(name)), allSortedList);
+    item->setData(Qt::UserRole, classif().GetTypeByReadableObjectName(name));
+  }
+  allSortedList->sortItems();
+
+  connect(allSortedList, &QAbstractItemView::clicked, this, &CreateFeatureDialog::OnListItemSelected);
+
+  QDialogButtonBox * dbb = new QDialogButtonBox();
+  dbb->addButton(QDialogButtonBox::Close);
+  connect(dbb, &QDialogButtonBox::clicked, this, &QDialog::reject);
+
+  QVBoxLayout * vBox = new QVBoxLayout();
+  vBox->addWidget(allSortedList);
+  vBox->addWidget(dbb);
+  setLayout(vBox);
+
+  setWindowTitle(qt::Tr("editor_add_select_category"));
+}
+
+void CreateFeatureDialog::OnListItemSelected(QModelIndex const & i)
+{
+  m_selectedType = i.data(Qt::UserRole).toUInt();
+  ASSERT(m_selectedType != ftype::GetEmptyValue(), ());
+
+  accept();
+}

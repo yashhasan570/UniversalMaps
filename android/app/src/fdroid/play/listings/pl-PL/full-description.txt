@@ -1,0 +1,44 @@
+Universal Maps to szybka i szczegółowa mapa turystyczna oraz nawigacja GPS offline po polsku – do podróży, wędrówek i przejażdżek rowerowych. Planuj, importuj i zapisuj trasy, ciesz się płynną nawigacją bez rozładowywania baterii i bez potrzeby połączenia z internetem. Aplikacja oferuje nieograniczone pobieranie map i aktualizacje co dwa tygodnie. Bazuje na OpenStreetMap, tworzona jest przez wolontariuszy, z pełnym poszanowaniem prywatności, działa w 100% offline i jest w pełni darmowa.
+
+<b>OFFLINE:</b> Aplikacja działa w pełni offline, w tym wyszukiwanie i nawigacja. Możesz korzystać z map i nawigować bez połączenia z internetem, oszczędzając transfer danych i unikając opłat roamingowych. Brak transferów w tle oznacza też dłuższe działanie baterii.
+
+<b>SZYBKO:</b> Powiększanie mapy, wyszukiwanie i obliczanie tras działają wyjątkowo szybko.
+
+<b>SZCZEGÓŁOWE I AKTUALNE:</b> Mapy turystyczne są bogate w detale i aktualizowane dwa razy w miesiącu, aby odzwierciedlały rzeczywiste warunki. W przeciwieństwie do wielu znanych konkurentów zawierają nazwy budynków, ławki, szlaki turystyczne i inne przydatne informacje.
+
+<b>OPARTE NA OPENSTREETMAP:</b> OpenStreetMap to światowa mapa w stylu wiki, tworzona i utrzymywana przez miliony wolontariuszy — lokalnych ekspertów najlepiej znających swoje regiony. Dzięki temu powstają szczegółowe mapy, często dokładniejsze niż komercyjne w mniej zmapowanych regionach. Universal Maps aktualizuje dane z OpenStreetMap co dwa tygodnie. Jeśli zauważysz brakujące miejsca, możesz je dodać do OpenStreetMap i pomóc ulepszyć mapę dla wszystkich.
+
+<b>PRYWATNOŚĆ:</b> Nie zbieramy żadnych danych ani identyfikatorów. Oznacza to brak ryzyka wycieku danych i brak rozpraszaczy, takich jak reklamy czy natrętne powiadomienia — tylko czysta, prywatna mapa.
+
+<b>WAŻNE FUNKCJE</b>
+
+<b>ODKRYWAJ MIEJSCA:</b> Szukaj po adresie, nazwie lub kategorii, odkrywaj miliony ciekawych miejsc i sprawdzaj szczegóły, takie jak godziny otwarcia, artykuły z Wikipedii, dostępność dla wózków inwalidzkich i inne przydatne dane.
+
+<b>NAWIGACJA GPS:</b> Korzystaj z głosowej nawigacji zakręt po zakręcie. Twórz trasy piesze, górskie, rowerowe i samochodowe — także między miastami i krajami, z wieloma punktami pośrednimi. Obsługiwany Android Auto.
+
+<b>SZLAKI TURYSTYCZNE I ROWEROWE Z CAŁEGO ŚWIATA:</b> Włącz specjalne warstwy mapy, aby odkrywać popularne trasy piesze i rowerowe na całym świecie, wszystkie z OpenStreetMap. Przełączaj warstwy, aby zobaczyć kolorowe trasy rowerowe i MTB oraz oficjalne szlaki turystyczne.
+
+<b>TEREN 3D I GŁĘBOKOŚCI:</b> Odkrywaj wysokości gór, głębokości mórz i szczegółowe poziomice. Dotknij dowolnego miejsca na mapie, aby zobaczyć wysokość nad poziomem morza.
+
+<b>TRANSPORT PUBLICZNY:</b> Wyznaczaj trasy komunikacją publiczną — metrem, koleją miejską, autobusem i tramwajem. Sprawdzaj numery linii na przystankach.
+
+<b>STYLE MAP:</b> Wybieraj warstwy mapy dopasowane do aktywności — Outdoor, Poziomice, Turystyka, Rower, Metro.
+
+<b>REJESTRATOR TRAS:</b> Nagrywaj, importuj, eksportuj i udostępniaj swoje trasy i ulubione miejsca. Obsługiwane formaty: KML, KMZ, GPX i GeoJSON.
+
+<b>ARTYKUŁY Z WIKIPEDII:</b> Odkrywaj artykuły z Wikipedii o miejscach na mapie. Wpisz „?wiki” w wyszukiwarce, aby zobaczyć wszystkie miejsca z artykułami.
+
+<b>EDYTOR MAP:</b> Wspieraj OpenStreetMap, dodając brakujące miejsca lub edytując mapę bezpośrednio w Universal Maps.
+
+<b>TRYB NOCNY:</b> Przełącz się na ciemny motyw, aby wygodnie korzystać z mapy w nocy.
+
+Wypróbuj aplikację — darmowa nawigacja bez internetu, szybka, w pełni offline i bez reklam.
+
+Universal Maps to niezależny, społecznościowy projekt open source z setkami współtwórców, którzy tworzą nowe funkcje, naprawiają błędy, tłumaczą i rozwijają projekt.
+
+Inne sposoby wsparcia projektu: https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Twoja szczera opinia i recenzje w sklepie motywują nas! Masz pytania? Zajrzyj do FAQ na universalmaps.app.
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsApp

@@ -1,0 +1,42 @@
+Universal Maps est une application rapide et détaillée de cartes hors ligne et de navigation GPS pour les voyages, la randonnée, le trekking et le vélo. Planifiez, importez et enregistrez des itinéraires, et profitez d’un guidage fluide sans connexion Internet ni perte de batterie. L’application offre des cartes illimitées, des mises à jour toutes les deux semaines, et repose sur OpenStreetMap. Créée par des bénévoles, elle est respectueuse de la vie privée, 100 % hors ligne et entièrement gratuite.
+
+<b>HORS LIGNE :</b> L’application fonctionne entièrement hors ligne — y compris la recherche et la navigation. Vous pouvez explorer la carte et naviguer sans connexion Internet, économisant vos données mobiles et évitant les frais d’itinérance. Et sans transferts de données en arrière-plan, votre batterie dure beaucoup plus longtemps.
+
+<b>RAPIDE :</b> Le zoom, la recherche et le calcul d’itinéraires sont remarquablement rapides.
+
+<b>DÉTAILLÉE & À JOUR :</b> Les cartes sont riches en détails et mises à jour deux fois par mois pour refléter les conditions réelles. Contrairement à de nombreux concurrents bien connus, elles incluent les noms de bâtiments, les bancs, les sentiers de randonnée et d’autres informations utiles.
+
+<b>CONFIDENTIALITÉ AVANT TOUT :</b> Nous ne collectons aucune donnée ni identifiant. Cela signifie aucun risque de fuite de données et aucune distraction comme des publicités ou notifications intrusives — juste une expérience de carte propre et privée.
+
+<b>FONCTIONNALITÉS IMPORTANTES</b>
+
+<b>DÉCOUVRIR DES LIEUX :</b> Recherchez par adresse, nom ou catégorie, découvrez des millions de points d’intérêt, et consultez des détails comme les horaires d’ouverture, les articles Wikipédia, l’accessibilité en fauteuil roulant et bien plus.
+
+<b>NAVIGATION GPS :</b> Profitez d’un guidage vocal, virage par virage. Créez des itinéraires de marche, de randonnée, de vélo ou en voiture — y compris entre villes, pays et avec plusieurs étapes. Compatible avec Android Auto.
+
+<b>SENTIERS DE RANDONNÉE & DE VÉLO DU MONDE ENTIER :</b> Activez des couches spéciales pour découvrir des itinéraires populaires de randonnée et de vélo dans le monde entier, tous issus d’OpenStreetMap. Basculez entre les couches pour voir les itinéraires vélo et VTT colorés, ainsi que les sentiers officiels.
+
+<b>RELIEF 3D & PROFONDEURS :</b> Explorez les reliefs montagneux, les profondeurs marines et les courbes de niveau détaillées. Touchez n’importe quel point de la carte pour connaître son altitude.
+
+<b>TRANSPORTS PUBLICS :</b> Planifiez des itinéraires en transports en commun. Les horaires en temps réel sont en cours de développement.
+
+<b>STYLES DE CARTE :</b> Choisissez les couches adaptées à votre activité — Extérieur, Courbes de niveau, Randonnée, Cyclisme ou Métro.
+
+<b>ENREGISTREUR DE PARCOURS :</b> Enregistrez, importez, exportez et partagez vos itinéraires et vos lieux favoris. Compatible avec les formats KML, KMZ, GPX et GeoJSON.
+
+<b>ARTICLES WIKIPÉDIA :</b> Consultez des articles Wikipédia pour les lieux affichés sur la carte. Tapez « ?wiki » dans la recherche pour trouver tous les lieux avec un article.
+
+<b>ÉDITEUR DE CARTE :</b> Contribuez à OpenStreetMap en ajoutant des lieux manquants ou en modifiant la carte directement depuis Universal Maps.
+
+<b>MODE SOMBRE :</b> Passez à un thème sombre pour une consultation confortable la nuit.
+
+Universal Maps est un projet indépendant, communautaire et open source, comptant des centaines de contributeurs qui aident à développer de nouvelles fonctionnalités, à corriger les problèmes, à traduire et à faire avancer le projet.
+
+Ou découvrez d’autres moyens de soutenir le projet : https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Vos commentaires et vos avis sincères sur la boutique nous motivent ! Nous apprécions vos retours.
+
+Vous avez des questions ? Veuillez consulter le site web universalmaps.app pour obtenir plus de détails et consulter la FAQ.
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsFR

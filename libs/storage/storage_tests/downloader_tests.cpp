@@ -1,0 +1,315 @@
+#include "testing/testing.hpp"
+
+#include "storage/map_files_downloader_with_ping.hpp"
+#include "storage/storage_tests/test_map_files_downloader.hpp"
+
+#include "platform/local_country_file_utils.hpp"
+#include "platform/mwm_version.hpp"
+#include "platform/platform.hpp"
+#include "platform/platform_tests_support/writable_dir_changer.hpp"
+
+#include "base/file_name_utils.hpp"
+#include "base/logging.hpp"
+
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "defines.hpp"
+#include "private.h"
+
+namespace downloader_tests
+{
+
+class DownloaderStub : public storage::MapFilesDownloaderWithPing
+{
+public:
+  using storage::MapFilesDownloader::MakeUrlList;
+
+  void Download(storage::QueuedCountry &&) override {}
+};
+
+class ConfiguredDownloaderStub : public DownloaderStub
+{
+public:
+  downloader::MetaConfig GetMetaConfig() override { return m_config; }
+
+  void LoadConfig()
+  {
+    EnsureMetaConfigReady([] { testing::StopEventLoop(); });
+    testing::RunEventLoop();
+  }
+
+  downloader::MetaConfig m_config;
+};
+
+UNIT_TEST(NormalizeDebugMapDownloadServer)
+{
+  std::string normalized;
+
+  TEST(storage::NormalizeDebugMapDownloadServer("https://example.com", normalized), ());
+  TEST_EQUAL(normalized, "https://example.com/", ());
+
+  TEST(storage::NormalizeDebugMapDownloadServer(" http://localhost:8000/maps ", normalized), ());
+  TEST_EQUAL(normalized, "http://localhost:8000/maps/", ());
+
+  TEST(!storage::NormalizeDebugMapDownloadServer("", normalized), ());
+  TEST(!storage::NormalizeDebugMapDownloadServer("http:/example.com", normalized), ());
+  TEST(!storage::NormalizeDebugMapDownloadServer("https:///example.com", normalized), ());
+  TEST(!storage::NormalizeDebugMapDownloadServer("ftp://example.com", normalized), ());
+  TEST(!storage::NormalizeDebugMapDownloadServer("https://example.com?token=1", normalized), ());
+  TEST(!storage::NormalizeDebugMapDownloadServer("https://exa mple.com", normalized), ());
+}
+
+UNIT_TEST(MapFilesDownloader_DebugServerList)
+{
+  DownloaderStub downloader;
+  downloader.SetServersList({"https://example.com/base/"});
+
+  auto urls = downloader.MakeUrlList("maps/1/Germany.mwm");
+  TEST_EQUAL(urls.size(), 1, ());
+  TEST_EQUAL(urls[0], "https://example.com/base/maps/1/Germany.mwm", ());
+  urls = downloader.MakeUrlList("terrain/2/N40E040.twm");
+  TEST_EQUAL(urls, (storage::MapFilesDownloader::ServersList{"https://example.com/base/terrain/2/N40E040.twm"}), ());
+
+  downloader.ResetServersList();
+  TEST(downloader.MakeUrlList("maps/1/Germany.mwm").empty(), ());
+  TEST(downloader.MakeUrlList("terrain/2/N40E040.twm").empty(), ());
+}
+
+UNIT_TEST(MapFilesDownloader_TerrainServers)
+{
+  WritableDirChanger const dir("terrain-servers", WritableDirChanger::SettingsDirPolicy::UseWritableDir);
+  Platform::ThreadRunner runner;
+  ConfiguredDownloaderStub downloader;
+  // A grid release can reference blocks from an older terrain version.
+  downloader.SetTerrainDataVersion(3);
+  downloader.m_config.servers = {"https://maps.example/"};
+  downloader.m_config.terrainServers = {"https://terrain1.example/", "https://terrain2.example/"};
+  downloader.LoadConfig();
+
+  TEST_EQUAL(downloader.MakeUrlList("maps/1/Germany.mwm"),
+             (storage::MapFilesDownloader::ServersList{"https://maps.example/maps/1/Germany.mwm"}), ());
+  TEST_EQUAL(downloader.MakeUrlList("diffs/1/0/Germany.mwmdiff"),
+             (storage::MapFilesDownloader::ServersList{"https://maps.example/diffs/1/0/Germany.mwmdiff"}), ());
+  TEST_EQUAL(downloader.MakeUrlList("terrain/2/N40E040.twm"),
+             (storage::MapFilesDownloader::ServersList{"https://terrain1.example/terrain/2/N40E040.twm",
+                                                       "https://terrain2.example/terrain/2/N40E040.twm"}),
+             ());
+
+  downloader.SetServersList({"https://debug.example/"});
+  TEST_EQUAL(downloader.MakeUrlList("terrain/2/N40E040.twm"),
+             (storage::MapFilesDownloader::ServersList{"https://debug.example/terrain/2/N40E040.twm"}), ());
+  downloader.ResetServersList();
+  downloader.LoadConfig();
+  TEST_EQUAL(downloader.MakeUrlList("terrain/2/N40E040.twm").size(), 2, ());
+  TEST_EQUAL(downloader.MakeUrlList("maps/1/Germany.mwm"),
+             (storage::MapFilesDownloader::ServersList{"https://maps.example/maps/1/Germany.mwm"}), ());
+}
+
+UNIT_TEST(MapFilesDownloader_LegacyTerrainServers)
+{
+  WritableDirChanger const dir("legacy-terrain-servers", WritableDirChanger::SettingsDirPolicy::UseWritableDir);
+  Platform::ThreadRunner runner;
+  ConfiguredDownloaderStub downloader;
+  // An older meta server without terrain mirrors: the DEFAULT_URLS_JSON ones serve the terrain.
+  downloader.m_config = *downloader::ParseMetaConfig(R"({"servers":["https://maps.example/"]})");
+  downloader.LoadConfig();
+  TEST_EQUAL(downloader.MakeUrlList("terrain/2/N40E040.twm"),
+             (storage::MapFilesDownloader::ServersList{"https://cdn-nl1.universalmaps.app/terrain/2/N40E040.twm",
+                                                       "https://cdn-uk1.universalmaps.app/terrain/2/N40E040.twm",
+                                                       "https://cdn.universalmaps.app/terrain/2/N40E040.twm"}),
+             ());
+}
+
+// Records the start order of the requests queued before the servers were known.
+class StartOrderDownloader : public ConfiguredDownloaderStub
+{
+public:
+  void Download(storage::QueuedCountry && country) override { m_started.push_back(country.GetCountryId()); }
+
+  void Request(storage::CountryId const & id, MapFileType type)
+  {
+    DownloadMapFile(storage::QueuedCountry(platform::CountryFile(id), id, type, version::FOR_TESTING_MWM1, {},
+                                           std::make_shared<storage::diffs::DiffsDataSource>()));
+  }
+
+  storage::CountriesVec m_started;
+};
+
+UNIT_TEST(MapFilesDownloader_PendingMapGoesBeforeTerrain)
+{
+  WritableDirChanger const dir("pending-map-order", WritableDirChanger::SettingsDirPolicy::UseWritableDir);
+  Platform::ThreadRunner runner;
+  StartOrderDownloader downloader;
+  downloader.m_config.servers = {"https://maps.example/"};
+  // Nothing is in progress while the servers are unknown, so the map overtakes the first block too.
+  downloader.Request("N45E008", MapFileType::Terrain);
+  downloader.Request("N45E014", MapFileType::Terrain);
+  downloader.Request("Germany", MapFileType::Map);
+  downloader.LoadConfig();
+  TEST_EQUAL(downloader.m_started, (storage::CountriesVec{"Germany", "N45E008", "N45E014"}), ());
+}
+
+UNIT_TEST(MapFilesDownloader_SortServersByPing)
+{
+  downloader::MetaConfig config;
+  config.servers = {"https://origin.example/", "https://mirror.example/"};
+  config.terrainServers = {"https://origin.example/", "https://mirror.example/"};
+  // Only the mirror answers: the origin stays as the terrain fallback for the blocks the mirror lacks.
+  storage::SortServersByPing(config, {"https://mirror.example/"});
+  using List = downloader::MetaConfig::ServersList;
+  TEST_EQUAL(config.servers, (List{"https://mirror.example/"}), ());
+  TEST_EQUAL(config.terrainServers, (List{"https://mirror.example/", "https://origin.example/"}), ());
+
+  config.servers = config.terrainServers = {"https://a.example/", "https://b.example/", "https://c.example/"};
+  storage::SortServersByPing(config, {"https://c.example/", "https://a.example/"});
+  TEST_EQUAL(config.servers, (List{"https://c.example/", "https://a.example/"}), ());
+  TEST_EQUAL(config.terrainServers, (List{"https://c.example/", "https://a.example/", "https://b.example/"}), ());
+
+  // Nothing answers: both pools keep their original order.
+  storage::SortServersByPing(config, {});
+  TEST_EQUAL(config.servers, (List{"https://c.example/", "https://a.example/"}), ());
+  TEST_EQUAL(config.terrainServers, (List{"https://c.example/", "https://a.example/", "https://b.example/"}), ());
+}
+
+UNIT_TEST(GetMetaConfig)
+{
+  if (std::string(METASERVER_URL).empty())
+    return;
+
+  base::ScopedLogLevelChanger logLevel(base::LDEBUG);
+  Platform::ThreadRunner runner;
+
+  auto const metaConfig = DownloaderStub().GetMetaConfig();
+  TEST_GREATER(metaConfig.servers.size(), 0, ());
+  for (auto const & s : metaConfig.servers)
+    LOG(LINFO, (s));
+}
+
+class HttpDownloaderTest : public storage::QueuedCountry::Subscriber
+{
+public:
+  ~HttpDownloaderTest() override { m_downloader.Clear(); }
+
+  void OnCountryInQueue(storage::QueuedCountry const &) override {}
+  void OnStartDownloading(storage::QueuedCountry const & country) override { m_onStart(country); }
+  void OnDownloadProgress(storage::QueuedCountry const &, downloader::Progress const &) override {}
+  void OnDownloadFinished(storage::QueuedCountry const &, downloader::DownloadStatus status) override
+  {
+    TEST_EQUAL(status, downloader::DownloadStatus::Failed, ());
+    ++m_failures;
+  }
+
+protected:
+  void Enqueue(storage::CountryId const & id, int64_t version = version::FOR_TESTING_MWM1)
+  {
+    TEST(!platform::PrepareDirToDownloadCountry(version, {}).empty(), ());
+    storage::QueuedCountry country(platform::CountryFile(id, 1, {}), id, MapFileType::Map, version, {},
+                                   std::make_shared<storage::diffs::DiffsDataSource>());
+    country.Subscribe(*this);
+    m_downloader.DownloadMapFile(std::move(country));
+  }
+
+  std::string DownloadingPath(storage::CountryId const & id, int64_t version = version::FOR_TESTING_MWM1) const
+  {
+    return platform::GetFileDownloadPath(version, id, MapFileType::Map) + DOWNLOADING_FILE_EXTENSION;
+  }
+
+  WritableDirChanger const m_dir{"http-downloader-tests", WritableDirChanger::SettingsDirPolicy::UseWritableDir};
+  Platform::ThreadRunner m_threads;
+  storage::TestMapFilesDownloader m_downloader;
+  std::function<void(storage::QueuedCountry const &)> m_onStart;
+  size_t m_failures = 0;
+};
+
+UNIT_CLASS_TEST(HttpDownloaderTest, CancelFromStartCallback)
+{
+  for (bool const clear : {false, true})
+  {
+    m_onStart = [&](storage::QueuedCountry const & country)
+    {
+      auto const id = country.GetCountryId();
+      if (clear)
+        m_downloader.Clear();
+      else
+        m_downloader.Remove(id);
+    };
+    Enqueue("Wonderland_West");
+    TEST(m_downloader.GetQueue().IsEmpty(), (clear));
+    TEST(!Platform::IsFileExistsByFullPath(DownloadingPath("Wonderland_West")), (clear));
+  }
+}
+
+UNIT_CLASS_TEST(HttpDownloaderTest, ReplaceFromStartCallback)
+{
+  for (bool const failReplacement : {false, true})
+  {
+    int64_t const newVersion = version::FOR_TESTING_MWM1 + (failReplacement ? 2 : 1);
+    size_t starts = 0;
+    m_onStart = [&](storage::QueuedCountry const & country)
+    {
+      if (++starts == 1)
+      {
+        auto const id = country.GetCountryId();
+        m_downloader.Remove(id);
+        Enqueue(id, newVersion);
+      }
+      else if (failReplacement)
+      {
+        // Force request creation to fail: the old attempt must still stay cancelled.
+        TEST_EQUAL(Platform::RmDir(base::GetDirectory(country.GetFileDownloadPath())), Platform::ERR_OK, ());
+      }
+    };
+    Enqueue("Wonderland_West");
+    TEST_EQUAL(starts, 2, (failReplacement));
+    TEST_EQUAL(m_downloader.GetQueue().Count() + m_failures, 1, (failReplacement));
+    TEST(!Platform::IsFileExistsByFullPath(DownloadingPath("Wonderland_West")), (failReplacement));
+    TEST_EQUAL(Platform::IsFileExistsByFullPath(DownloadingPath("Wonderland_West", newVersion)), !failReplacement,
+               (failReplacement));
+    m_downloader.Clear();
+  }
+}
+
+UNIT_CLASS_TEST(HttpDownloaderTest, AdvanceQueueFromStartCallback)
+{
+  size_t starts = 0;
+  m_onStart = [&](storage::QueuedCountry const & country)
+  {
+    if (++starts == 1)
+    {
+      auto const id = country.GetCountryId();
+      Enqueue("Wonderland_East");
+      m_downloader.Remove(id);
+    }
+  };
+  Enqueue("Wonderland_West");
+  TEST_EQUAL(starts, 2, ());
+  TEST_EQUAL(m_downloader.GetQueue().Count(), 1, ());
+  TEST(m_downloader.GetQueue().Contains("Wonderland_East"), ());
+  TEST(!Platform::IsFileExistsByFullPath(DownloadingPath("Wonderland_West")), ());
+  TEST(Platform::IsFileExistsByFullPath(DownloadingPath("Wonderland_East")), ());
+}
+
+UNIT_CLASS_TEST(HttpDownloaderTest, RemoveQueuedCountryFromStartCallback)
+{
+  size_t starts = 0;
+  m_onStart = [&](storage::QueuedCountry const &)
+  {
+    if (++starts == 1)
+    {
+      Enqueue("Wonderland_East");
+      m_downloader.Remove("Wonderland_East");
+    }
+  };
+  Enqueue("Wonderland_West");
+  TEST_EQUAL(starts, 1, ());
+  TEST_EQUAL(m_downloader.GetQueue().Count(), 1, ());
+  TEST(m_downloader.GetQueue().Contains("Wonderland_West"), ());
+  TEST(Platform::IsFileExistsByFullPath(DownloadingPath("Wonderland_West")), ());
+  TEST(!Platform::IsFileExistsByFullPath(DownloadingPath("Wonderland_East")), ());
+}
+
+}  // namespace downloader_tests

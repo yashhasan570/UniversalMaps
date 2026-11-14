@@ -1,0 +1,158 @@
+#import "MWMFrameworkListener.h"
+#import "MWMFrameworkObservers.h"
+
+#include <CoreApi/Framework.h>
+
+#include "platform/downloader_defines.hpp"
+
+#include "base/assert.hpp"
+
+namespace
+{
+using Observer = id<MWMFrameworkObserver>;
+using TRouteBuildingObserver = id<MWMFrameworkRouteBuilderObserver>;
+using TDrapeObserver = id<MWMFrameworkDrapeObserver>;
+
+using Observers = NSHashTable<Observer>;
+
+Protocol * pRouteBuildingObserver = @protocol(MWMFrameworkRouteBuilderObserver);
+Protocol * pDrapeObserver = @protocol(MWMFrameworkDrapeObserver);
+
+using TLoopBlock = void (^)(__kindof Observer observer);
+
+void NotifyObservers(Observers * observers, TLoopBlock block)
+{
+  // Core listeners already run on the GUI/main thread; synchronous delivery preserves event ordering.
+  ASSERT(NSThread.isMainThread, ());
+  // A handler may register or remove observers while processing a notification.
+  for (Observer observer in observers.allObjects)
+    block(observer);
+}
+}  // namespace
+
+@interface MWMFrameworkListener ()
+
+@property(nonatomic) Observers * routeBuildingObservers;
+@property(nonatomic) Observers * drapeObservers;
+
+@end
+
+@implementation MWMFrameworkListener
+
++ (MWMFrameworkListener *)listener
+{
+  ASSERT(NSThread.isMainThread, ());
+  static MWMFrameworkListener * listener;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{ listener = [[super alloc] initListener]; });
+  return listener;
+}
+
++ (void)addObserver:(Observer)observer
+{
+  MWMFrameworkListener * listener = [MWMFrameworkListener listener];
+  if ([observer conformsToProtocol:pRouteBuildingObserver])
+    [listener.routeBuildingObservers addObject:observer];
+  if ([observer conformsToProtocol:pDrapeObserver])
+    [listener.drapeObservers addObject:observer];
+}
+
++ (void)removeObserver:(Observer)observer
+{
+  MWMFrameworkListener * listener = [MWMFrameworkListener listener];
+  [listener.routeBuildingObservers removeObject:observer];
+  [listener.drapeObservers removeObject:observer];
+}
+
+- (instancetype)initListener
+{
+  self = [super init];
+  if (self)
+  {
+    _routeBuildingObservers = [Observers weakObjectsHashTable];
+    _drapeObservers = [Observers weakObjectsHashTable];
+
+    [self registerRouteBuilderListener];
+    [self registerDrapeObserver];
+  }
+  return self;
+}
+
+#pragma mark - MWMFrameworkRouteBuilderObserver
+
+- (void)registerRouteBuilderListener
+{
+  using namespace routing;
+  using namespace storage;
+  Observers * observers = self.routeBuildingObservers;
+  auto & rm = GetFramework().GetRoutingManager();
+  rm.SetRouteBuildingListener([observers](RouterResultCode code, CountriesSet const & absentCountries)
+  {
+    NotifyObservers(observers, [code, &absentCountries](TRouteBuildingObserver observer)
+    { [observer processRouteBuilderEvent:code countries:absentCountries]; });
+  });
+  rm.SetRouteProgressListener([observers](float progress)
+  {
+    NotifyObservers(observers, [progress](TRouteBuildingObserver observer)
+    {
+      if ([observer respondsToSelector:@selector(processRouteBuilderProgress:)])
+        [observer processRouteBuilderProgress:progress];
+    });
+  });
+  rm.SetRouteRecommendationListener([observers](RoutingManager::Recommendation recommendation)
+  {
+    MWMRouterRecommendation rec;
+    switch (recommendation)
+    {
+    case RoutingManager::Recommendation::RebuildAfterPointsLoading:
+      rec = MWMRouterRecommendationRebuildAfterPointsLoading;
+      break;
+    }
+    NotifyObservers(observers, [rec](TRouteBuildingObserver observer)
+    {
+      if ([observer respondsToSelector:@selector(processRouteRecommendation:)])
+        [observer processRouteRecommendation:rec];
+    });
+  });
+  rm.SetRouteSpeedCamShowListener([observers](m2::PointD const & point, double cameraSpeedKmPH)
+  {
+    NotifyObservers(observers, [cameraSpeedKmPH](TRouteBuildingObserver observer)
+    {
+      if ([observer respondsToSelector:@selector(speedCameraShowedUpOnRoute:)])
+        [observer speedCameraShowedUpOnRoute:cameraSpeedKmPH];
+    });
+  });
+  rm.SetRouteSpeedCamsClearListener([observers]()
+  {
+    NotifyObservers(observers, ^(TRouteBuildingObserver observer) {
+      if ([observer respondsToSelector:@selector(speedCameraLeftVisibleArea)])
+        [observer speedCameraLeftVisibleArea];
+    });
+  });
+}
+
+#pragma mark - MWMFrameworkDrapeObserver
+
+- (void)registerDrapeObserver
+{
+  Observers * observers = self.drapeObservers;
+  auto & f = GetFramework();
+  f.SetCurrentCountryChangedListener([observers](CountryId const & countryId)
+  {
+    NotifyObservers(observers, [&countryId](TDrapeObserver observer)
+    {
+      if ([observer respondsToSelector:@selector(processViewportCountryEvent:)])
+        [observer processViewportCountryEvent:countryId];
+    });
+  });
+
+  f.SetViewportListener([observers](ScreenBase const &)
+  {
+    NotifyObservers(observers, ^(TDrapeObserver observer) {
+      if ([observer respondsToSelector:@selector(processViewportChangedEvent)])
+        [observer processViewportChangedEvent];
+    });
+  });
+}
+
+@end

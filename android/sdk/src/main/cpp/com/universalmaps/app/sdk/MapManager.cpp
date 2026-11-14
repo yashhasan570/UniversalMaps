@@ -1,0 +1,570 @@
+#include "Framework.hpp"
+
+#include "com/universalmaps/app/sdk/core/jni_helper.hpp"
+#include "com/universalmaps/app/sdk/core/jni_java_methods.hpp"
+
+#include "coding/internal/file_data.hpp"
+
+#include "storage/country_info_getter.hpp"
+#include "storage/storage.hpp"
+#include "storage/storage_helpers.hpp"
+
+#include "base/stl_helpers.hpp"
+#include "base/thread_checker.hpp"
+
+#include "platform/downloader_defines.hpp"
+#include "platform/downloader_utils.hpp"
+#include "platform/local_country_file_utils.hpp"
+#include "platform/mwm_version.hpp"
+
+#include <array>
+#include <functional>
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
+namespace
+{
+enum ItemCategory : uint32_t
+{
+  NEAR_ME,
+  DOWNLOADED,
+  AVAILABLE,
+};
+
+DECLARE_THREAD_CHECKER(g_batchingThreadChecker);
+// Each changed country once (e.g. the shared terrain owners notify per block), with the status at the batch end.
+std::unordered_map<jobject, std::pair<std::weak_ptr<jobject>, std::vector<storage::CountryId>>> g_batchedCallbackData;
+bool g_isBatched;
+
+storage::Storage & GetStorage()
+{
+  return g_framework->GetStorage();
+}
+
+storage::CountriesVec ToCountriesVec(JNIEnv * env, jobjectArray jcountries)
+{
+  storage::CountriesVec countries(env->GetArrayLength(jcountries));
+  for (size_t i = 0; i < countries.size(); ++i)
+  {
+    jni::TScopedLocalRef const item(env, env->GetObjectArrayElement(jcountries, static_cast<jsize>(i)));
+    countries[i] = jni::ToNativeString(env, static_cast<jstring>(item.get()));
+  }
+  return countries;
+}
+
+storage::Storage & GetThreadedStorage()
+{
+  return g_framework.thread_check()->GetStorage();
+}
+
+struct CountryItemBuilder
+{
+  jclass m_class;
+  jmethodID m_ctor, m_updateProgress;
+  jfieldID m_Id, m_Name, m_DirectParentId, m_TopmostParentId, m_DirectParentName, m_TopmostParentName, m_Description,
+      m_Size, m_DownloadSize, m_ChildCount, m_TotalChildCount, m_Present, m_Category, m_Status, m_ErrorCode;
+
+  CountryItemBuilder(JNIEnv * env)
+  {
+    m_class = jni::GetGlobalClassRef(env, "com/universalmaps/app/sdk/downloader/CountryItem");
+    m_ctor = jni::GetConstructorID(env, m_class, "(Ljava/lang/String;)V");
+    m_updateProgress = env->GetMethodID(m_class, "updateProgress", "(JJ)V");
+
+    m_Id = env->GetFieldID(m_class, "id", "Ljava/lang/String;");
+    m_Name = env->GetFieldID(m_class, "name", "Ljava/lang/String;");
+    m_DirectParentId = env->GetFieldID(m_class, "directParentId", "Ljava/lang/String;");
+    m_TopmostParentId = env->GetFieldID(m_class, "topmostParentId", "Ljava/lang/String;");
+    m_DirectParentName = env->GetFieldID(m_class, "directParentName", "Ljava/lang/String;");
+    m_TopmostParentName = env->GetFieldID(m_class, "topmostParentName", "Ljava/lang/String;");
+    m_Description = env->GetFieldID(m_class, "description", "Ljava/lang/String;");
+    m_Size = env->GetFieldID(m_class, "size", "J");
+    m_DownloadSize = env->GetFieldID(m_class, "downloadSize", "J");
+    m_ChildCount = env->GetFieldID(m_class, "childCount", "I");
+    m_TotalChildCount = env->GetFieldID(m_class, "totalChildCount", "I");
+    m_Present = env->GetFieldID(m_class, "present", "Z");
+    m_Category = env->GetFieldID(m_class, "category", "I");
+    m_Status = env->GetFieldID(m_class, "status", "I");
+    m_ErrorCode = env->GetFieldID(m_class, "errorCode", "I");
+  }
+
+  DECLARE_BUILDER_INSTANCE(CountryItemBuilder);
+  jobject Create(JNIEnv * env, jobject id) const { return env->NewObject(m_class, m_ctor, id); }
+};
+
+static storage::CountryId const GetRootId(JNIEnv * env, jstring root)
+{
+  return (root ? jni::ToNativeString(env, root) : GetStorage().GetRootId());
+}
+}  // namespace
+
+extern "C"
+{
+// static String nativeGetRoot();
+JNIEXPORT jstring Java_app_universalmaps_sdk_downloader_MapManager_nativeGetRoot(JNIEnv * env, jclass clazz)
+{
+  return jni::ToJavaString(env, GetStorage().GetRootId());
+}
+
+// static boolean nativeMoveFile(String oldFile, String newFile);
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeMoveFile(JNIEnv * env, jclass clazz,
+                                                                                 jstring oldFile, jstring newFile)
+{
+  return base::MoveFileX(jni::ToNativeString(env, oldFile), jni::ToNativeString(env, newFile));
+}
+
+// static boolean nativeHasSpaceToDownloadAmount(long bytes);
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeHasSpaceToDownloadAmount(JNIEnv * env,
+                                                                                                 jclass clazz,
+                                                                                                 jlong bytes)
+{
+  return storage::IsEnoughSpaceForDownload(bytes);
+}
+
+// static boolean nativeHasSpaceToDownloadCountry(String root);
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeHasSpaceToDownloadCountry(JNIEnv * env,
+                                                                                                  jclass clazz,
+                                                                                                  jstring root)
+{
+  return storage::IsEnoughSpaceForDownload(jni::ToNativeString(env, root), GetStorage());
+}
+
+// static long nativeGetDownloadSize(String[] countries, boolean withTerrain);
+JNIEXPORT jlong Java_app_universalmaps_sdk_downloader_MapManager_nativeGetDownloadSize(JNIEnv * env, jclass,
+                                                                                     jobjectArray jcountries,
+                                                                                     jboolean withTerrain)
+{
+  return static_cast<jlong>(GetStorage().GetDownloadSize(ToCountriesVec(env, jcountries), withTerrain));
+}
+
+// static long nativeGetRemainingDownloadSize(String[] countries, boolean withTerrain);
+JNIEXPORT jlong Java_app_universalmaps_sdk_downloader_MapManager_nativeGetRemainingDownloadSize(JNIEnv * env, jclass,
+                                                                                              jobjectArray jcountries,
+                                                                                              jboolean withTerrain)
+{
+  return static_cast<jlong>(GetStorage().GetRemainingDownloadSize(ToCountriesVec(env, jcountries), withTerrain));
+}
+
+// static boolean nativeHasSpaceToUpdate(String root);
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeHasSpaceToUpdate(JNIEnv * env, jclass clazz,
+                                                                                         jstring root)
+{
+  return IsEnoughSpaceForUpdate(jni::ToNativeString(env, root), GetStorage());
+}
+
+// static int nativeGetDownloadedCount();
+JNIEXPORT jint Java_app_universalmaps_sdk_downloader_MapManager_nativeGetDownloadedCount(JNIEnv * env, jclass clazz)
+{
+  return static_cast<jint>(GetStorage().GetDownloadedFilesCount());
+}
+
+// static @Nullable UpdateInfo nativeGetUpdateInfo(@Nullable String root);
+JNIEXPORT jobject Java_app_universalmaps_sdk_downloader_MapManager_nativeGetUpdateInfo(JNIEnv * env, jclass clazz,
+                                                                                     jstring root)
+{
+  storage::Storage::UpdateInfo info;
+  if (!GetStorage().GetUpdateInfo(GetRootId(env, root), info))
+    return nullptr;
+
+  static jclass const infoClass = jni::GetGlobalClassRef(env, "com/universalmaps/app/sdk/downloader/UpdateInfo");
+  ASSERT(infoClass, (jni::DescribeException()));
+  static jmethodID const ctor = jni::GetConstructorID(env, infoClass, "(IJ)V");
+  ASSERT(ctor, (jni::DescribeException()));
+
+  return env->NewObject(infoClass, ctor, info.m_numberOfMwmFilesToUpdate, info.m_totalDownloadSizeInBytes);
+}
+
+static void UpdateItemShort(JNIEnv * env, jobject item, storage::NodeStatus const status,
+                            storage::NodeErrorCode const error)
+{
+  auto const & ciBuilder = CountryItemBuilder::Instance(env);
+
+  env->SetIntField(item, ciBuilder.m_Status, static_cast<jint>(status));
+  env->SetIntField(item, ciBuilder.m_ErrorCode, static_cast<jint>(error));
+}
+
+static void UpdateItem(JNIEnv * env, jobject item, storage::NodeAttrs const & attrs)
+{
+  auto const & ciBuilder = CountryItemBuilder::Instance(env);
+  using SLR = jni::TScopedLocalRef;
+
+  // Localized name
+  env->SetObjectField(item, ciBuilder.m_Name, SLR(env, jni::ToJavaString(env, attrs.m_nodeLocalName)).get());
+
+  // Direct parent[s]. Do not specify if there are multiple or none.
+  if (attrs.m_parentInfo.size() == 1)
+  {
+    storage::CountryIdAndName const & info = attrs.m_parentInfo[0];
+    env->SetObjectField(item, ciBuilder.m_DirectParentId, SLR(env, jni::ToJavaString(env, info.m_id)).get());
+    env->SetObjectField(item, ciBuilder.m_DirectParentName, SLR(env, jni::ToJavaString(env, info.m_localName)).get());
+  }
+  else
+  {
+    env->SetObjectField(item, ciBuilder.m_DirectParentId, nullptr);
+    env->SetObjectField(item, ciBuilder.m_DirectParentName, nullptr);
+  }
+
+  // Topmost parent[s]. Do not specify if there are multiple or none.
+  if (attrs.m_topmostParentInfo.size() == 1)
+  {
+    storage::CountryIdAndName const & info = attrs.m_topmostParentInfo[0];
+    env->SetObjectField(item, ciBuilder.m_TopmostParentId, SLR(env, jni::ToJavaString(env, info.m_id)).get());
+    env->SetObjectField(item, ciBuilder.m_TopmostParentName, SLR(env, jni::ToJavaString(env, info.m_localName)).get());
+  }
+  else
+  {
+    env->SetObjectField(item, ciBuilder.m_TopmostParentId, nullptr);
+    env->SetObjectField(item, ciBuilder.m_TopmostParentName, nullptr);
+  }
+
+  // Description
+  env->SetObjectField(item, ciBuilder.m_Description,
+                      SLR(env, jni::ToJavaString(env, attrs.m_nodeLocalDescription)).get());
+
+  // Sizes
+  env->SetLongField(item, ciBuilder.m_Size, attrs.m_localMwmSize);
+  env->SetLongField(item, ciBuilder.m_DownloadSize, attrs.m_downloadSize);
+
+  // Child counts
+  env->SetIntField(item, ciBuilder.m_ChildCount, attrs.m_downloadingMwmCounter);
+  env->SetIntField(item, ciBuilder.m_TotalChildCount, attrs.m_mwmCounter);
+
+  // Status and error code
+  UpdateItemShort(env, item, attrs.m_status, attrs.m_error);
+
+  // Presence flag
+  env->SetBooleanField(item, ciBuilder.m_Present, attrs.m_present);
+
+  // Progress
+  auto const & progress = attrs.m_downloadingProgress;
+  env->CallVoidMethod(item, ciBuilder.m_updateProgress, static_cast<jlong>(progress.m_bytesDownloaded),
+                      static_cast<jlong>(progress.m_bytesTotal));
+}
+
+static void PutItemsToList(
+    JNIEnv * env, jobject const list, storage::CountriesVec const & children, int category,
+    std::function<bool(storage::CountryId const & countryId, storage::NodeAttrs const & attrs)> const & predicate)
+{
+  auto const & ciBuilder = CountryItemBuilder::Instance(env);
+  auto const listAddMethod = jni::ListBuilder::Instance(env).m_add;
+
+  storage::NodeAttrs attrs;
+  for (storage::CountryId const & child : children)
+  {
+    GetStorage().GetNodeAttrs(child, attrs);
+
+    if (predicate && !predicate(child, attrs))
+      continue;
+
+    using SLR = jni::TScopedLocalRef;
+    SLR const item(env, ciBuilder.Create(env, SLR(env, jni::ToJavaString(env, child))));
+    env->SetIntField(item.get(), ciBuilder.m_Category, category);
+
+    UpdateItem(env, item.get(), attrs);
+
+    // Put to resulting list
+    env->CallBooleanMethod(list, listAddMethod, item.get());
+  }
+}
+
+// static void nativeListItems(@Nullable String root, double lat, double lon, boolean hasLocation, boolean myMapsMode,
+// List<CountryItem> result);
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeListItems(JNIEnv * env, jclass clazz,
+                                                                              jstring parent, jdouble lat, jdouble lon,
+                                                                              jboolean hasLocation, jboolean myMapsMode,
+                                                                              jobject result)
+{
+  if (hasLocation && !myMapsMode)
+  {
+    storage::CountriesVec near;
+    g_framework->NativeFramework()->GetCountryInfoGetter().GetRegionsCountryId(mercator::FromLatLon(lat, lon), near);
+    PutItemsToList(env, result, near, ItemCategory::NEAR_ME,
+                   [](storage::CountryId const & countryId, storage::NodeAttrs const & attrs) -> bool
+    { return !attrs.m_present; });
+  }
+
+  storage::CountriesVec downloaded, available;
+  GetStorage().GetChildrenInGroups(GetRootId(env, parent), downloaded, available, true);
+
+  if (myMapsMode)
+    PutItemsToList(env, result, downloaded, ItemCategory::DOWNLOADED, nullptr);
+  else
+    PutItemsToList(env, result, available, ItemCategory::AVAILABLE, nullptr);
+}
+
+// static void nativeUpdateItem(CountryItem item);
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeGetAttributes(JNIEnv * env, jclass, jobject item)
+{
+  auto const & ciBuilder = CountryItemBuilder::Instance(env);
+  jni::TScopedLocalRef const id(env, env->GetObjectField(item, ciBuilder.m_Id));
+  auto const countryId = jni::ToNativeString(env, static_cast<jstring>(id.get()));
+
+  storage::NodeAttrs attrs;
+  GetStorage().GetNodeAttrs(countryId, attrs);
+
+  UpdateItem(env, item, attrs);
+}
+
+// static void nativeGetStatus(String root);
+JNIEXPORT jint Java_app_universalmaps_sdk_downloader_MapManager_nativeGetStatus(JNIEnv * env, jclass clazz, jstring root)
+{
+  storage::NodeStatuses ns;
+  GetStorage().GetNodeStatuses(jni::ToNativeString(env, root), ns);
+  return static_cast<jint>(ns.m_status);
+}
+
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeHasLatestVersion(JNIEnv * env, jclass,
+                                                                                         jstring countryId)
+{
+  return GetStorage().HasLatestVersion(jni::ToNativeString(env, countryId));
+}
+
+// static void nativeGetError(String root);
+JNIEXPORT jint Java_app_universalmaps_sdk_downloader_MapManager_nativeGetError(JNIEnv * env, jclass clazz, jstring root)
+{
+  storage::NodeStatuses ns;
+  GetStorage().GetNodeStatuses(jni::ToNativeString(env, root), ns);
+  return static_cast<jint>(ns.m_error);
+}
+
+// static String nativeGetName(String root);
+JNIEXPORT jstring Java_app_universalmaps_sdk_downloader_MapManager_nativeGetName(JNIEnv * env, jclass clazz, jstring root)
+{
+  return jni::ToJavaString(env, GetStorage().GetNodeLocalName(jni::ToNativeString(env, root)));
+}
+
+// static @Nullable String nativeFindCountry(double lat, double lon);
+JNIEXPORT jstring Java_app_universalmaps_sdk_downloader_MapManager_nativeFindCountry(JNIEnv * env, jclass clazz,
+                                                                                   jdouble lat, jdouble lon)
+{
+  return jni::ToJavaString(
+      env, g_framework->NativeFramework()->GetCountryInfoGetter().GetRegionCountryId(mercator::FromLatLon(lat, lon)));
+}
+
+// static boolean nativeIsDownloading();
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeIsDownloading(JNIEnv * env, jclass clazz)
+{
+  return static_cast<jboolean>(GetStorage().IsDownloadInProgress());
+}
+
+static void StartBatchingCallbacks()
+{
+  CHECK_THREAD_CHECKER(g_batchingThreadChecker, ("StartBatchingCallbacks"));
+  ASSERT(!g_isBatched, ());
+  ASSERT(g_batchedCallbackData.empty(), ());
+
+  g_isBatched = true;
+}
+
+static void EndBatchingCallbacks(JNIEnv * env)
+{
+  CHECK_THREAD_CHECKER(g_batchingThreadChecker, ("EndBatchingCallbacks"));
+
+  auto const & listBuilder = jni::ListBuilder::Instance(env);
+  static jclass batchDataClass =
+      jni::GetGlobalClassRef(env, "com/universalmaps/app/sdk/downloader/MapManager$StorageCallbackData");
+  static jmethodID batchDataCtor = jni::GetConstructorID(env, batchDataClass, "(Ljava/lang/String;IIZ)V");
+
+  for (auto const & [_, key] : g_batchedCallbackData)
+  {
+    auto ptr = key.first.lock();
+    if (!ptr)
+      continue;
+
+    // Allocate resulting ArrayList
+    using SLR = jni::TScopedLocalRef;
+    SLR const list(env, listBuilder.CreateArray(env, key.second.size()));
+
+    for (storage::CountryId const & countryId : key.second)
+    {
+      storage::NodeStatuses ns;
+      GetStorage().GetNodeStatuses(countryId, ns);
+
+      // Create StorageCallbackData instance…
+      SLR const id(env, jni::ToJavaString(env, countryId));
+      SLR const item(env, env->NewObject(batchDataClass, batchDataCtor, id.get(), static_cast<jint>(ns.m_status),
+                                         static_cast<jint>(ns.m_error), !ns.m_groupNode));
+      // …and put it into the resulting list
+      env->CallBooleanMethod(list.get(), listBuilder.m_add, item.get());
+    }
+
+    // Invoke Java callback
+    jmethodID const method = jni::GetMethodID(env, *ptr, "onStatusChanged", "(Ljava/util/List;)V");
+    env->CallVoidMethod(*ptr, method, list.get());
+  }
+
+  g_batchedCallbackData.clear();
+  g_isBatched = false;
+}
+
+// static void nativeDownload(String root, boolean withTerrain);
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeDownload(JNIEnv * env, jclass clazz, jstring root,
+                                                                             jboolean withTerrain)
+{
+  StartBatchingCallbacks();
+  GetStorage().DownloadNode(jni::ToNativeString(env, root), false /* isUpdate */, withTerrain);
+  EndBatchingCallbacks(env);
+}
+
+// static boolean nativeRetry(String root);
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeRetry(JNIEnv * env, jclass clazz, jstring root)
+{
+  StartBatchingCallbacks();
+  GetStorage().RetryDownloadNode(jni::ToNativeString(env, root));
+  EndBatchingCallbacks(env);
+}
+
+// static void nativeUpdate(String root);
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeUpdate(JNIEnv * env, jclass clazz, jstring root)
+{
+  StartBatchingCallbacks();
+  GetStorage().UpdateNode(GetRootId(env, root));
+  EndBatchingCallbacks(env);
+}
+
+// static void nativeCancel(String root, boolean withTerrain);
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeCancel(JNIEnv * env, jclass clazz, jstring root,
+                                                                           jboolean withTerrain)
+{
+  StartBatchingCallbacks();
+  GetStorage().CancelDownloadNode(GetRootId(env, root), withTerrain);
+  EndBatchingCallbacks(env);
+}
+
+// static void nativeDelete(String root);
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeDelete(JNIEnv * env, jclass clazz, jstring root)
+{
+  StartBatchingCallbacks();
+  auto const countryId = jni::ToNativeString(env, root);
+  GetStorage().DeleteNode(countryId);
+  EndBatchingCallbacks(env);
+}
+
+static jobject ToJavaProgress(JNIEnv * env, storage::Progress const & progress)
+{
+  static jclass const progressClass = jni::GetGlobalClassRef(env, "com/universalmaps/app/sdk/downloader/MapManager$Progress");
+  static jmethodID const ctor = jni::GetConstructorID(env, progressClass, "(JJJJ)V");
+  return env->NewObject(progressClass, ctor, static_cast<jlong>(progress.m_mwmDownloaded),
+                        static_cast<jlong>(progress.m_mwmTotal), static_cast<jlong>(progress.m_twmDownloaded),
+                        static_cast<jlong>(progress.m_twmTotal));
+}
+
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeIsLeaf(JNIEnv * env, jclass, jstring countryId)
+{
+  return GetStorage().IsLeaf(jni::ToNativeString(env, countryId));
+}
+
+static void StatusChangedCallback(std::shared_ptr<jobject> const & listenerRef, storage::CountryId const & countryId)
+{
+  auto & e = g_batchedCallbackData[*listenerRef];
+  e.first = listenerRef;
+  if (!base::IsExist(e.second, countryId))
+    e.second.push_back(countryId);
+
+  if (!g_isBatched)
+    EndBatchingCallbacks(jni::GetEnv());
+}
+
+static void ProgressChangedCallback(std::shared_ptr<jobject> const & listenerRef, storage::CountryId const & countryId,
+                                    storage::Progress const & progress)
+{
+  JNIEnv * env = jni::GetEnv();
+  jmethodID const methodID = jni::GetMethodID(
+      env, *listenerRef, "onProgress", "(Ljava/lang/String;Lcom/universalmaps/app/sdk/downloader/MapManager$Progress;)V");
+  jni::TScopedLocalRef const javaProgress(env, ToJavaProgress(env, progress));
+  env->CallVoidMethod(*listenerRef, methodID, jni::TScopedLocalRef(env, jni::ToJavaString(env, countryId)).get(),
+                      javaProgress.get());
+}
+
+// static int nativeSubscribe(StorageCallback listener);
+JNIEXPORT jint Java_app_universalmaps_sdk_downloader_MapManager_nativeSubscribe(JNIEnv * env, jclass clazz,
+                                                                              jobject listener)
+{
+  // When calling from DownloadService.onCreate
+  // https://github.com/universalmaps/universalmaps/issues/11741
+  if (!g_framework)
+    return 0;
+
+  return GetThreadedStorage().Subscribe(
+      std::bind(&StatusChangedCallback, jni::make_global_ref(listener), std::placeholders::_1),
+      std::bind(&ProgressChangedCallback, jni::make_global_ref(listener), std::placeholders::_1,
+                std::placeholders::_2));
+}
+
+// static void nativeUnsubscribe(int slot);
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeUnsubscribe(JNIEnv * env, jclass clazz, jint slot)
+{
+  if (!g_framework)
+    return;
+
+  GetThreadedStorage().Unsubscribe(slot);
+}
+
+// static void nativeSubscribeOnCountryChanged(CurrentCountryChangedListener listener);
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeSubscribeOnCountryChanged(JNIEnv * env,
+                                                                                              jclass clazz,
+                                                                                              jobject listener)
+{
+  frm()->SetCurrentCountryChangedListener(
+      [listener = jni::make_global_ref(listener)](storage::CountryId const & countryId)
+  {
+    JNIEnv * env = jni::GetEnv();
+    jmethodID methodID = jni::GetMethodID(env, *listener, "onCurrentCountryChanged", "(Ljava/lang/String;)V");
+    env->CallVoidMethod(*listener, methodID, jni::TScopedLocalRef(env, jni::ToJavaString(env, countryId)).get());
+  });
+}
+
+// static void nativeUnsubscribeOnCountryChanged();
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeUnsubscribeOnCountryChanged(JNIEnv * env,
+                                                                                                jclass clazz)
+{
+  frm()->SetCurrentCountryChangedListener(nullptr);
+}
+
+// static boolean nativeHasUnsavedEditorChanges(String root);
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeHasUnsavedEditorChanges(JNIEnv * env,
+                                                                                                jclass clazz,
+                                                                                                jstring root)
+{
+  return frm()->HasUnsavedEdits(jni::ToNativeString(env, root));
+}
+
+// static long[] nativeGetOverallProgressBytes(String[] countries);
+JNIEXPORT jlongArray Java_app_universalmaps_sdk_downloader_MapManager_nativeGetOverallProgressBytes(
+    JNIEnv * env, jclass clazz, jobjectArray jcountries)
+{
+  downloader::Progress const progress = GetStorage().GetOverallProgress(ToCountriesVec(env, jcountries));
+
+  return jni::ToJavaLongArray(env, std::array<jlong, 2>{static_cast<jlong>(progress.m_bytesDownloaded),
+                                                        static_cast<jlong>(progress.m_bytesTotal)});
+}
+
+// static boolean nativeIsAutoretryFailed();
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeIsAutoretryFailed(JNIEnv * env, jclass clazz)
+{
+  return g_framework->IsAutoRetryDownloadFailed();
+}
+
+// static boolean nativeIsDownloadOn3gEnabled();
+JNIEXPORT jboolean Java_app_universalmaps_sdk_downloader_MapManager_nativeIsDownloadOn3gEnabled(JNIEnv * env,
+                                                                                              jclass clazz)
+{
+  return g_framework->IsDownloadOn3gEnabled();
+}
+
+// static void nativeEnableDownloadOn3g();
+JNIEXPORT void Java_app_universalmaps_sdk_downloader_MapManager_nativeEnableDownloadOn3g(JNIEnv * env, jclass clazz)
+{
+  g_framework->EnableDownloadOn3g();
+}
+
+// static @Nullable String nativeGetSelectedCountry();
+JNIEXPORT jstring Java_app_universalmaps_sdk_downloader_MapManager_nativeGetSelectedCountry(JNIEnv * env, jclass clazz)
+{
+  if (!frm()->HasPlacePageInfo())
+    return nullptr;
+
+  storage::CountryId const & res = g_framework->GetPlacePageInfo().GetCountryId();
+  return (res == storage::kInvalidCountryId ? nullptr : jni::ToJavaString(env, res));
+}
+}  // extern "C"

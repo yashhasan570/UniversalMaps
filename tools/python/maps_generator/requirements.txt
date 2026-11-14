@@ -1,0 +1,4 @@
+-r ../post_generation/requirements.txt
+filelock==4.2.6
+requests>=2.34.2
+requests_file==3.0.1

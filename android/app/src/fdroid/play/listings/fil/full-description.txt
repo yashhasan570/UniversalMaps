@@ -1,0 +1,64 @@
+Ang Universal Maps ay isang mabilis, detalyadong offline na mapa at GPS navigation app para sa paglalakbay, hiking, trekking, at cycling adventures. Magplano, mag-import, at magrekord ng mga ruta, at mag-enjoy ng tuloy-tuloy na gabay nang hindi nauubos ang iyong baterya o nang hindi gumagamit ng internet. Nag-aalok ang app ng walang limitasyong pag-download ng mapa at pag-update tuwing dalawang linggo. Batay sa OpenStreetMap, gawa ng mga boluntaryo, prayoridad ang privacy, 100% offline, at 100% libre.
+
+<b>OFFLINE:</b>
+
+Gumagana ang app nang 100% offline — kasama na ang paghahanap at pag-navigate. Maaari kang mag-explore ng mapa at mag-navigate nang walang internet connection, na makakatipid sa mobile data at roaming fees. At dahil walang background data transfers, mas matagal tumagal ang baterya mo.
+
+<b>Mabilis:</b>
+
+Ang pag-zoom, paghahanap, at pagkalkula ng ruta ay talagang mabilis.
+
+<b>Detalyado at Na-update:</b>
+
+Ang mga mapa ay sagana sa detalye at ina-update nang dalawang beses sa isang buwan upang ipakita ang aktwal na kalagayan. Hindi tulad ng maraming kilalang kakumpitensya, kasama rito ang mga label ng gusali, bangko, mga daanan sa pag-hiking, at iba pang kapaki-pakinabang na impormasyon.
+
+<b>UNA ANG PRIVACY:</b>
+
+Hindi kami nangongolekta ng anumang datos o identifier. Ibig sabihin, walang panganib ng pagtagas ng datos at walang istorbo gaya ng mga ad o maingay na notification — puro lang malinis at pribadong karanasan sa mapa.
+
+<b>MAHALAGANG MGA TAMPOK</b>
+
+<b>TUKLASIN ANG MGA LUGAR:</b>
+
+Maghanap gamit ang address, pangalan, o kategorya, tuklasin ang milyun-milyong POI, at tingnan ang detalyadong impormasyon gaya ng oras ng pagbubukas, mga artikulo sa Wikipedia, accessibility para sa wheelchair, at iba pang kapaki-pakinabang na detalye.
+
+<b>GPS NA NAVIGASYON:</b>
+
+Mag-enjoy ng tinuturong direksyon, hakbang-hakbang. Lumikha ng mga ruta para sa paglalakad, pag-hiking, pagbibisikleta, o pagmamaneho — kabilang ang mga ruta sa pagitan ng mga lungsod, bansa, at maramihang waypoint. Suportado ang Android Auto.
+
+<b>MGA RUTA PARA SA HIKING AT PAGBIBISIKLETA SA BUONG MUNDO:</b>
+
+I-enable ang mga espesyal na layer ng mapa para matuklasan ang mga sikat na ruta ng hiking at pagsisiklod sa buong mundo, na lahat ay hango sa OpenStreetMap. Lumipat-lipat sa mga layer para makita ang makukulay na ruta ng bisikleta at MTB, pati na rin ang mga opisyal na daanan para sa hiking.
+
+<b>3D NA TERRAIN AT LALIM:</b>
+
+Tingnan ang taas ng mga bundok, lalim ng dagat at detalyadong contour lines. I-tap ang anumang bahagi ng mapa para makita ang taas nito.
+
+<b>PAMPUBLIKONG TRANSPORTASYON:</b>
+
+Maaari kang magplano ng mga ruta gamit ang pampublikong transportasyon. Kasalukuyang binubuo ang suporta para sa mga iskedyul sa totoong oras.
+
+<b>MGA ISTILO NG MAPA:</b>
+
+Pumili ng mga layer ng mapa na akma sa iyong aktibidad — Panlabas, Mga Kontur na Linya, Pag-hiking, Pag-bisikleta, o Metro/Subway.
+
+<b>TAGAREKORD NG RUTA:</b>
+
+I-record, i-import, i-export, at ibahagi ang iyong mga ruta at mga paboritong lugar. Sinusuportahan ang mga format na KML, KMZ, GPX, at GeoJSON.
+
+<b>MGA ARTIKULO NG WIKIPEDIA:</b>
+
+Galugarin ang mga artikulo ng Wikipedia para sa mga lugar na natutuklasan mo sa mapa. I-type ang "?wiki" sa paghahanap para mahanap ang mga lugar na may artikulo.
+
+<b>EDITOR NG MAPA:</b> Mag-ambag sa OpenStreetMap sa pamamagitan ng pagdaragdag ng mga nawawalang lugar o pag-edit ng mapa nang direkta mula sa Universal Maps.
+
+<b>DARK MODE:</b> Lumipat sa madilim na tema para sa komportableng pagtingin sa gabi.
+
+O alamin ang iba pang paraan para suportahan ang proyekto: https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Ang inyong tapat na puna at mga pagsusuri sa tindahan ang nagbibigay sa amin ng motibasyon! Ikinagagalak naming marinig mula sa inyo doon.
+
+May mga tanong? Mangyaring bisitahin ang website ng universalmaps.app para sa karagdagang detalye at FAQ.
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsApp

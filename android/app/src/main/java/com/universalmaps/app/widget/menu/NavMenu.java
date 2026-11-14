@@ -1,0 +1,293 @@
+package com.universalmaps.app.widget.menu;
+
+import android.graphics.drawable.Drawable;
+import android.location.Location;
+import android.util.Pair;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.lifecycle.DefaultLifecycleObserver;
+import androidx.lifecycle.LifecycleOwner;
+import com.universalmaps.app.MwmApplication;
+import com.universalmaps.app.R;
+import com.universalmaps.app.sdk.routing.RoutingInfo;
+import com.universalmaps.app.sdk.sound.TtsPlayer;
+import com.universalmaps.app.sdk.util.StringUtils;
+import com.universalmaps.app.sdk.widgets.speedlimit.Mode;
+import com.universalmaps.app.sdk.widgets.speedlimit.SpeedThresholds;
+import com.universalmaps.app.util.Graphics;
+import com.universalmaps.app.util.ThemeUtils;
+import com.universalmaps.app.util.UiUtils;
+import com.universalmaps.app.util.Utils;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+import java.util.concurrent.TimeUnit;
+
+public class NavMenu implements DefaultLifecycleObserver
+{
+  private final BottomSheetBehavior<View> mNavBottomSheetBehavior;
+  private final View mBottomSheetBackground;
+  private final View mHeaderFrame;
+
+  private final ImageView mTts;
+  private final View mSpeedViewContainer;
+  private final TextView mSpeedValue;
+  private final TextView mSpeedUnits;
+  private final TextView mTimeHourValue;
+  private final TextView mTimeHourUnits;
+  private final TextView mTimeMinuteValue;
+  private final TextView mTimeMinuteUnits;
+  private final TextView mTimeEstimate;
+  private final TextView mDistanceValue;
+  private final TextView mDistanceUnits;
+  private final LinearProgressIndicator mRouteProgress;
+
+  private final AppCompatActivity mActivity;
+  private final NavMenuListener mNavMenuListener;
+  private final Runnable mTtsStateListener = this::refreshTts;
+
+  private int currentPeekHeight = 0;
+  private Mode mSpeedMode = Mode.Normal;
+  private int mSpeedLimit = 0;
+
+  public interface OnMenuSizeChangedListener
+  {
+    void OnMenuSizeChange();
+  }
+
+  private final OnMenuSizeChangedListener mOnMenuSizeChangedListener;
+
+  public NavMenu(AppCompatActivity activity, NavMenuListener navMenuListener,
+                 OnMenuSizeChangedListener onMenuSizeChangedListener)
+  {
+    mActivity = activity;
+    mNavMenuListener = navMenuListener;
+    final View bottomFrame = mActivity.findViewById(R.id.nav_bottom_frame);
+    mHeaderFrame = bottomFrame.findViewById(R.id.line_frame);
+    mOnMenuSizeChangedListener = onMenuSizeChangedListener;
+    mHeaderFrame.setOnClickListener(v -> toggleNavMenu());
+    mHeaderFrame.addOnLayoutChangeListener((view, i, i1, i2, i3, i4, i5, i6, i7) -> setPeekHeight());
+    mNavBottomSheetBehavior = BottomSheetBehavior.from(mActivity.findViewById(R.id.nav_bottom_sheet));
+    mBottomSheetBackground = mActivity.findViewById(R.id.nav_bottom_sheet_background);
+    mBottomSheetBackground.setOnClickListener(v -> collapseNavBottomSheet());
+    mBottomSheetBackground.setVisibility(View.GONE);
+    mBottomSheetBackground.setAlpha(0);
+    mNavBottomSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+      @Override
+      public void onStateChanged(@NonNull View bottomSheet, int newState)
+      {
+        if (newState == BottomSheetBehavior.STATE_COLLAPSED || newState == BottomSheetBehavior.STATE_HIDDEN)
+        {
+          mBottomSheetBackground.setVisibility(View.GONE);
+          mBottomSheetBackground.setAlpha(0);
+        }
+        else
+        {
+          mBottomSheetBackground.setVisibility(View.VISIBLE);
+        }
+      }
+
+      @Override
+      public void onSlide(@NonNull View bottomSheet, float slideOffset)
+      {
+        mBottomSheetBackground.setAlpha(slideOffset);
+      }
+    });
+
+    // Bottom frame
+    mSpeedViewContainer = bottomFrame.findViewById(R.id.speed_view_container);
+    mSpeedValue = bottomFrame.findViewById(R.id.speed_value);
+    mSpeedUnits = bottomFrame.findViewById(R.id.speed_dimen);
+    mTimeHourValue = bottomFrame.findViewById(R.id.time_hour_value);
+    mTimeHourUnits = bottomFrame.findViewById(R.id.time_hour_dimen);
+    mTimeMinuteValue = bottomFrame.findViewById(R.id.time_minute_value);
+    mTimeMinuteUnits = bottomFrame.findViewById(R.id.time_minute_dimen);
+    mTimeEstimate = bottomFrame.findViewById(R.id.time_estimate);
+    mDistanceValue = bottomFrame.findViewById(R.id.distance_value);
+    mDistanceUnits = bottomFrame.findViewById(R.id.distance_dimen);
+    mRouteProgress = bottomFrame.findViewById(R.id.navigation_progress);
+
+    // Bottom frame buttons
+    ImageView mSettings = bottomFrame.findViewById(R.id.settings);
+    mSettings.setOnClickListener(v -> onSettingsClicked());
+    mTts = bottomFrame.findViewById(R.id.tts_volume);
+    mTts.setOnClickListener(v -> onTtsClicked());
+    Button stop = bottomFrame.findViewById(R.id.stop);
+    stop.setOnClickListener(v -> onStopClicked());
+    UiUtils.updateRedButton(stop);
+
+    TtsPlayer.addStateChangedListener(mTtsStateListener);
+    mActivity.getLifecycle().addObserver(this);
+  }
+
+  @Override
+  public void onDestroy(@NonNull LifecycleOwner owner)
+  {
+    TtsPlayer.removeStateChangedListener(mTtsStateListener);
+  }
+
+  private void onStopClicked()
+  {
+    mNavMenuListener.onStopClicked();
+  }
+
+  private void onSettingsClicked()
+  {
+    mNavMenuListener.onSettingsClicked();
+  }
+
+  private void onTtsClicked()
+  {
+    switch (TtsPlayer.getState())
+    {
+    case INITIALIZING: return;
+    case UNAVAILABLE:
+    case NEEDS_LANGUAGE: mNavMenuListener.onTtsVoiceSettingsClicked(); return;
+    case READY_ON:
+    case READY_OFF: TtsPlayer.setEnabled(!TtsPlayer.isEnabled()); return;
+    default: return;
+    }
+  }
+
+  private void toggleNavMenu()
+  {
+    if (getBottomSheetState() == BottomSheetBehavior.STATE_EXPANDED)
+      collapseNavBottomSheet();
+    else
+      expandNavBottomSheet();
+  }
+
+  public void setPeekHeight()
+  {
+    int headerHeight = mHeaderFrame.getHeight();
+    if (currentPeekHeight != headerHeight)
+    {
+      currentPeekHeight = headerHeight;
+      mNavBottomSheetBehavior.setPeekHeight(currentPeekHeight);
+      mOnMenuSizeChangedListener.OnMenuSizeChange();
+    }
+  }
+
+  public void collapseNavBottomSheet()
+  {
+    mNavBottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+  }
+
+  public void expandNavBottomSheet()
+  {
+    mNavBottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+  }
+
+  public int getBottomSheetState()
+  {
+    return mNavBottomSheetBehavior.getState();
+  }
+
+  public void refreshTts()
+  {
+    final Drawable icon;
+    switch (TtsPlayer.getState())
+    {
+    case READY_ON:
+      icon = Graphics.tint(mActivity, R.drawable.ic_voice_on, androidx.appcompat.R.attr.colorAccent);
+      break;
+    case READY_OFF: icon = Graphics.tint(mActivity, R.drawable.ic_voice_off); break;
+    case INITIALIZING:
+    case UNAVAILABLE:
+    case NEEDS_LANGUAGE:
+    default: icon = Graphics.tint(mActivity, R.drawable.ic_voice_off, R.attr.iconTintDisabled); break;
+    }
+    mTts.setImageDrawable(icon);
+  }
+
+  private void updateTime(int seconds)
+  {
+    updateTimeLeft(seconds);
+    updateTimeEstimate(seconds);
+  }
+
+  private void updateTimeLeft(int seconds)
+  {
+    final long totalMinutes = Utils.getRoutingMinutes(seconds);
+    final long hours = TimeUnit.MINUTES.toHours(totalMinutes);
+    final long minutes = totalMinutes % 60;
+    mTimeMinuteValue.setText(String.valueOf(minutes));
+    String min = mActivity.getResources().getString(R.string.minute);
+    mTimeMinuteUnits.setText(min);
+    UiUtils.showIf(hours == 0 || minutes > 0, mTimeMinuteUnits, mTimeMinuteValue);
+    if (hours == 0)
+    {
+      UiUtils.hide(mTimeHourUnits, mTimeHourValue);
+      return;
+    }
+    UiUtils.setTextAndShow(mTimeHourValue, String.valueOf(hours));
+    String hour = mActivity.getResources().getString(R.string.hour);
+    UiUtils.setTextAndShow(mTimeHourUnits, hour);
+  }
+
+  private void updateTimeEstimate(int seconds)
+  {
+    mTimeEstimate.setText(Utils.formatArrivalTime(mActivity, seconds));
+  }
+
+  private void updateSpeedView(@NonNull RoutingInfo info)
+  {
+    final Location last = MwmApplication.from(mActivity).getLocationHelper().getSavedLocation();
+    if (last == null)
+      return;
+
+    final double speedMps = last.hasSpeed() ? last.getSpeed() : 0;
+    final Pair<String, String> speedAndUnits = StringUtils.nativeFormatSpeedAndUnits(speedMps);
+    mSpeedValue.setText(speedAndUnits.first);
+
+    final int speed = StringUtils.nativeFormatSpeed(speedMps);
+    final int speedLimit = info.speedLimitMps > 0 ? StringUtils.nativeFormatSpeed(info.speedLimitMps) : 0;
+    if (mSpeedLimit != speedLimit || !speedAndUnits.second.contentEquals(mSpeedUnits.getText()))
+      mSpeedMode = Mode.Normal;
+    mSpeedLimit = speedLimit;
+    mSpeedMode = SpeedThresholds.DEFAULT.modeFor(speed, speedLimit, mSpeedMode);
+
+    switch (info.isSpeedCamLimitExceeded() ? Mode.Alert : mSpeedMode)
+    {
+    case Normal ->
+    {
+      mSpeedViewContainer.setActivated(false);
+      mSpeedValue.setTextColor(ThemeUtils.getColor(mActivity, android.R.attr.textColorPrimary));
+    }
+    case Warning ->
+    {
+      mSpeedViewContainer.setActivated(false);
+      mSpeedValue.setTextColor(ContextCompat.getColor(mActivity, R.color.base_yellow));
+    }
+    case Alert ->
+    {
+      mSpeedViewContainer.setActivated(true);
+      mSpeedValue.setTextColor(ContextCompat.getColor(mActivity, R.color.white_primary));
+    }
+    }
+
+    mSpeedUnits.setText(speedAndUnits.second);
+  }
+
+  public void update(@NonNull RoutingInfo info)
+  {
+    updateSpeedView(info);
+    updateTime(info.totalTimeInSeconds);
+    mDistanceValue.setText(info.distToTarget.mDistanceStr);
+    mDistanceUnits.setText(info.distToTarget.getUnitsStr(mActivity.getApplicationContext()));
+    mRouteProgress.setProgressCompat((int) info.completionPercent, true);
+  }
+
+  public interface NavMenuListener
+  {
+    void onStopClicked();
+
+    void onSettingsClicked();
+
+    void onTtsVoiceSettingsClicked();
+  }
+}

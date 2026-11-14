@@ -1,0 +1,179 @@
+package com.universalmaps.app.sdk.car.renderer;
+
+import android.graphics.Rect;
+import android.hardware.display.VirtualDisplay;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.car.app.CarContext;
+import androidx.car.app.SurfaceContainer;
+import androidx.core.content.ContextCompat;
+import androidx.lifecycle.LifecycleOwner;
+import com.universalmaps.app.sdk.Framework;
+import com.universalmaps.app.sdk.MapRenderingListener;
+import com.universalmaps.app.sdk.display.DisplayManager;
+import com.universalmaps.app.sdk.location.LocationHelper;
+import com.universalmaps.app.sdk.util.log.Logger;
+import java.util.Objects;
+
+final class SurfaceCallback extends SurfaceCallbackBase
+{
+  private static final String TAG = SurfaceCallback.class.getSimpleName();
+
+  private static final String VIRTUAL_DISPLAY_NAME = "OM_Android_Auto_Display";
+
+  @NonNull
+  private final LifecycleOwner mLifecycleOwner;
+
+  @NonNull
+  private final LocationHelper mLocationHelper;
+
+  @NonNull
+  private final MapRenderingListener mMapRenderingListener;
+
+  @NonNull
+  private final DisplayManager mDisplayManager;
+
+  @Nullable
+  private VirtualDisplay mVirtualDisplay;
+  @Nullable
+  private CarPresentation mPresentation;
+
+  private int mCurrentSpeed = 0;
+  @NonNull
+  private String mSpeedUnits = "";
+  @Nullable
+  private Integer mSpeedLimit;
+  @Framework.SpeedLimitSignType
+  private int mSpeedLimitSignType = Framework.SpeedLimitSignType.VIENNA;
+  private boolean mAlertForced = false;
+
+  public SurfaceCallback(@NonNull CarContext carContext, @NonNull LifecycleOwner lifecycleOwner,
+                         @NonNull LocationHelper locationHelper, @NonNull MapRenderingListener mapRenderingListener,
+                         @NonNull DisplayManager displayManager)
+  {
+    super(carContext);
+    mLifecycleOwner = lifecycleOwner;
+    mLocationHelper = locationHelper;
+    mMapRenderingListener = mapRenderingListener;
+    mDisplayManager = displayManager;
+  }
+
+  @Override
+  public void onSurfaceAvailable(@NonNull SurfaceContainer surfaceContainer)
+  {
+    Logger.d(TAG, "Surface available " + surfaceContainer);
+
+    if (mVirtualDisplay == null)
+    {
+      final android.hardware.display.DisplayManager displayManager =
+          ContextCompat.getSystemService(mCarContext, android.hardware.display.DisplayManager.class);
+      mVirtualDisplay =
+          Objects.requireNonNull(displayManager)
+              .createVirtualDisplay(VIRTUAL_DISPLAY_NAME, surfaceContainer.getWidth(), surfaceContainer.getHeight(),
+                                    surfaceContainer.getDpi(), surfaceContainer.getSurface(), 0);
+    }
+    else
+    {
+      mVirtualDisplay.setSurface(surfaceContainer.getSurface());
+      mVirtualDisplay.resize(surfaceContainer.getWidth(), surfaceContainer.getHeight(), surfaceContainer.getDpi());
+    }
+
+    if (mPresentation == null)
+      createPresentation();
+    startPresenting();
+  }
+
+  @Override
+  public void onVisibleAreaChanged(@NonNull Rect visibleArea)
+  {
+    super.onVisibleAreaChanged(visibleArea);
+    if (mPresentation != null)
+      mPresentation.setVisibleArea(visibleArea);
+  }
+
+  @Override
+  public void onSurfaceDestroyed(@NonNull SurfaceContainer surfaceContainer)
+  {
+    Logger.d(TAG, "Surface destroyed");
+
+    stopPresenting();
+    if (mVirtualDisplay != null)
+      mVirtualDisplay.setSurface(null);
+  }
+
+  void destroy()
+  {
+    clearPresentation();
+
+    if (mVirtualDisplay != null)
+    {
+      mVirtualDisplay.release();
+      mVirtualDisplay = null;
+    }
+  }
+
+  void stopPresenting()
+  {
+    if (mPresentation != null)
+      mPresentation.stopPresenting();
+  }
+
+  void startPresenting()
+  {
+    if (mPresentation != null && mDisplayManager.isCarDisplayUsed())
+      mPresentation.startPresenting();
+  }
+
+  void setCurrentSpeed(int speed, @NonNull String units)
+  {
+    mCurrentSpeed = speed;
+    mSpeedUnits = units;
+    if (mPresentation != null)
+      mPresentation.setCurrentSpeed(speed, units);
+  }
+
+  void setSpeedLimit(@Nullable Integer speedLimit)
+  {
+    mSpeedLimit = speedLimit;
+    if (mPresentation != null)
+      mPresentation.setSpeedLimit(speedLimit);
+  }
+
+  void setSpeedLimitSignType(@Framework.SpeedLimitSignType int type)
+  {
+    mSpeedLimitSignType = type;
+    if (mPresentation != null)
+      mPresentation.setSpeedLimitSignType(type);
+  }
+
+  void setAlertForced(boolean alertForced)
+  {
+    mAlertForced = alertForced;
+    if (mPresentation != null)
+      mPresentation.setAlertForced(alertForced);
+  }
+
+  private void createPresentation()
+  {
+    if (mVirtualDisplay == null)
+      return;
+
+    mPresentation = new CarPresentation(mCarContext, mVirtualDisplay.getDisplay(), mLifecycleOwner, mLocationHelper,
+                                        mMapRenderingListener);
+    mPresentation.create();
+    mPresentation.setVisibleArea(mVisibleArea);
+    mPresentation.setCurrentSpeed(mCurrentSpeed, mSpeedUnits);
+    mPresentation.setSpeedLimit(mSpeedLimit);
+    mPresentation.setSpeedLimitSignType(mSpeedLimitSignType);
+    mPresentation.setAlertForced(mAlertForced);
+  }
+
+  private void clearPresentation()
+  {
+    if (mPresentation != null)
+    {
+      mPresentation.destroy();
+      mPresentation = null;
+    }
+  }
+}

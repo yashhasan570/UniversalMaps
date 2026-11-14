@@ -1,0 +1,39 @@
+Universal Maps, seyahatler, yürüyüşler ve sürüşler için hızlı ve detaylı bir çevrimdışı harita ve GPS navigasyon uygulamasıdır. Rotalar planlayın, içe aktarın ve kaydedin ve pilinizi tüketmeden veya internet bağlantısı kullanmadan sorunsuz yönlendirmelerin keyfini çıkarın. Dünyanın dört bir yanındaki açık hava maceralarınız ve seyahatleriniz sırasında yerleri keşfedin ve güvenle gezin. Uygulama sınırsız harita indirme ve iki haftada bir güncelleme sunar. OpenStreetMap tabanlı, gönüllüler tarafından yapılmış, gizlilik odaklı, %100 çevrimdışı ve %100 ücretsizdir.
+
+ÇEVRİMDIŞI: Uygulama %100 çevrimdışı çalışır — arama ve navigasyon dahil. Haritayı keşfedebilir ve internet bağlantısı olmadan gezinebilirsiniz; böylece mobil veri ve dolaşım ücretlerinden tasarruf edersiniz. Arka planda veri transferi olmadığından piliniz çok daha uzun süre dayanır.
+
+DETAYLI VE GÜNCEL: Haritalar detay açısından zengindir ve gerçek dünya koşullarını yansıtacak şekilde ayda iki kez güncellenir. Birçok tanınmış rakibin aksine, bina etiketleri, banklar, yürüyüş yolları ve diğer faydalı bilgiler içerir.
+
+OPENSTREETMAP TABANLI: OpenStreetMap, milyonlarca gönüllü tarafından oluşturulan ve sürdürülen wiki tarzı bir dünya haritasıdır — bölgelerini en iyi bilen yerel halk. Bu topluluk çalışması, genellikle az haritalanmış bölgelerde ticari haritalardan daha doğru olan son derece detaylı haritalar ortaya çıkarır. Universal Maps, verilerini OpenStreetMap’ten iki haftada bir günceller, haritalarınızın taze ve güvenilir kalmasını sağlar. Eksik bir şey fark ederseniz, OpenStreetMap’e ekleyebilir ve haritayı herkes için geliştirmeye yardımcı olabilirsiniz.
+
+GİZLİLİK ÖNCELİKLİ: Hiçbir veri veya tanımlayıcı toplamayız. Bu, veri sızıntısı riski olmadığı ve reklam veya gürültülü bildirimler gibi dikkat dağıtıcı unsurlar olmadığı anlamına gelir — sadece temiz ve özel bir harita deneyimi.
+
+ÖNEMLİ ÖZELLİKLER:
+
+YERLERİ KEŞFEDİN: Adres, isim veya kategoriye göre arama yapın, milyonlarca POI (ilgi noktası) keşfedin ve açılış saatleri, Wikipedia makaleleri, tekerlekli sandalye erişilebilirliği ve diğer faydalı detayları görüntüleyin. Hepsi çevrimdışı kullanılabilir.
+
+GPS NAVİGASYON: Sesli, adım adım yönlendirmelerin keyfini çıkarın. Yürüyüş, doğa yürüyüşü, bisiklet veya sürüş rotaları oluşturun — şehirler, ülkeler ve birden fazla ara noktayı içeren rotalar dahil. CarPlay desteklenir.
+
+DÜNYA ÇAPINDA YÜRÜYÜŞ VE BİSİKLET ROTALARI: Popüler yürüyüş ve bisiklet rotalarını keşfetmek için özel harita katmanlarını etkinleştirin, tümü OpenStreetMap’ten alınmıştır. Renkli bisiklet ve MTB rotalarını ve resmi yürüyüş yollarını görmek için katmanlar arasında geçiş yapın.
+
+3D ARAZİ VE DERİNLİKLER: Dağ yüksekliklerini, deniz derinliklerini ve eş yükselti eğrilerini görün. Yüksekliği görmek için haritada herhangi bir yere dokunun.
+
+TOPLU TAŞIMA: Rotaları planlayın, duraklarda hat numaralarını görün. Gerçek zamanlı sefer saatleri geliştirme aşamasında.
+
+HARİTA STİLLERİ: Aktivitenize uygun harita katmanlarını seçin — Açık Alan, Yükselti Eğrileri, Yürüyüş, Bisiklet veya Metro.
+
+ROTALARI KAYDETME: Rotalarınızı ve favori yerlerinizi kaydedin, içe/dışa aktarın ve paylaşın. KML, KMZ, GPX ve GeoJSON formatlarını destekler.
+
+WIKIPEDIA MAKALELERİ: Haritada keşfettiğiniz yerler için Wikipedia makalelerini inceleyin. Tüm Wikipedia makaleli yerleri bulmak için aramada “?wiki” yazın.
+
+HARİTA DÜZENLEYİCİSİ: Eksik yerleri ekleyerek veya haritayı doğrudan Universal Maps’ten düzenleyerek OpenStreetMap’e katkıda bulunun.
+
+iCLOUD SENKRONİZASYONU: Tüm yer imlerinizi ve rotalarınızı kolayca yedekleyin ve iCloud ile senkronize edin.
+
+Uygulamayı deneyin — %100 ücretsiz, reklamsız, hızlı ve çevrimdışı.
+Universal Maps, yüzlerce gönüllünün özellik geliştirdiği, hata düzelttiği ve çeviri yaptığı bağımsız, açık kaynaklı bir topluluk projesidir.
+
+Projeyi desteklemenin diğer yollarını öğrenin: https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsTR

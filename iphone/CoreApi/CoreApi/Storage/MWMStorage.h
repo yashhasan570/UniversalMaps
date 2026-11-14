@@ -1,0 +1,76 @@
+#import <CoreLocation/CoreLocation.h>
+#import <Foundation/Foundation.h>
+
+@class MWMMapNodeAttributes;
+@class MWMMapUpdateInfo;
+
+NS_ASSUME_NONNULL_BEGIN
+
+extern NSErrorDomain const kStorageErrorDomain;
+
+extern NSInteger const kStorageNotEnoughSpace;
+extern NSInteger const kStorageNoConnection;
+extern NSInteger const kStorageCellularForbidden;
+extern NSInteger const kStorageRoutingActive;
+extern NSInteger const kStorageHaveUnsavedEdits;
+
+typedef struct
+{
+  uint64_t mwmDownloaded;
+  uint64_t mwmTotal;
+  uint64_t twmDownloaded;
+  uint64_t twmTotal;
+} MWMStorageProgress NS_SWIFT_NAME(StorageProgress);
+
+NS_SWIFT_NAME(StorageObserver)
+@protocol MWMStorageObserver <NSObject>
+
+- (void)processCountryEvent:(NSString *)countryId;
+
+@optional
+
+- (void)processCountry:(NSString *)countryId progress:(MWMStorageProgress)progress;
+
+@end
+
+NS_SWIFT_NAME(Storage)
+@interface MWMStorage : NSObject
+
++ (instancetype)sharedStorage;
+
+- (BOOL)downloadNode:(NSString *)countryId error:(NSError * __autoreleasing _Nullable *)error;
+- (void)retryDownloadNode:(NSString *)countryId;
+- (BOOL)updateNode:(NSString *)countryId error:(NSError * __autoreleasing _Nullable *)error;
+- (BOOL)deleteNode:(NSString *)countryId
+    ignoreUnsavedEdits:(BOOL)force
+                 error:(NSError * __autoreleasing _Nullable *)error;
+- (void)cancelDownloadNode:(NSString *)countryId;
+- (void)showNode:(NSString *)countryId;
+/// Downloads routing maps without terrain.
+- (BOOL)downloadMaps:(NSArray<NSString *> *)countryIds error:(NSError * __autoreleasing _Nullable *)error;
+
+- (BOOL)haveDownloadedCountries;
+- (BOOL)downloadInProgress;
+- (void)enableCellularDownload:(BOOL)enable;
+
+- (void)addObserver:(id<MWMStorageObserver>)observer;
+- (void)removeObserver:(id<MWMStorageObserver>)observer;
+
+#pragma mark - Attributes
+
+- (NSArray<NSString *> *)allCountries;
+- (NSArray<NSString *> *)allCountriesWithParent:(NSString *)countryId;
+- (NSArray<NSString *> *)downloadedCountries;
+- (NSArray<NSString *> *)downloadedCountriesWithParent:(NSString *)countryId;
+- (MWMMapNodeAttributes *)attributesForCountry:(NSString *)countryId;
+- (uint64_t)downloadSizeForCountry:(NSString *)countryId NS_SWIFT_NAME(downloadSize(forCountry:));
+- (MWMMapNodeAttributes *)attributesForRoot;
+- (NSString *)getRootId;
+- (NSString *)nameForCountry:(NSString *)countryId;
+- (nullable NSArray<NSString *> *)nearbyAvailableCountries:(CLLocationCoordinate2D)location;
+- (nullable NSString *)countryForViewportCenter;
+- (MWMMapUpdateInfo *)updateInfoWithParent:(nullable NSString *)countryId;
+
+@end
+
+NS_ASSUME_NONNULL_END

@@ -1,0 +1,44 @@
+Universal Maps er en hurtig og detaljeret offline kort- og GPS-navigationsapp til rejser, vandreture, trekking og cykelture. Planlæg, importer og optag ruter, og nyd problemfri navigation uden at dræne batteriet eller bruge internetforbindelse. Udforsk steder og navigér sikkert under dine udendørs eventyr og rejser rundt om i verden. Appen tilbyder ubegrænsede kortdownloads og opdateres hver anden uge. Baseret på OpenStreetMap, lavet af frivillige, med fokus på privatliv, 100 % offline og 100 % gratis.
+
+<b>OFFLINE:</b> Appen fungerer 100 % offline – inklusive søgning og navigation. Du kan udforske kortet og navigere uden internetforbindelse, hvilket sparer mobildata og roamingafgifter. Og uden dataoverførsel i baggrunden holder batteriet længere.
+
+<b>HURTIG:</b> Zoom, søgning og ruteberegning fungerer mærkbart hurtigt.
+
+<b>DETALJERET & OPDATERET:</b> Kortene er fyldt med detaljer og opdateres to gange om måneden for at afspejle virkeligheden. I modsætning til mange kendte konkurrenter indeholder de bygningsnavne, bænke, vandrestier og andre nyttige oplysninger.
+
+<b>BASERET PÅ OPENSTREETMAP:</b> OpenStreetMap er et wiki-lignende verdenskort, der bygges og vedligeholdes af millioner af frivillige – lokale, som kender deres områder bedst. Fællesskabet skaber meget detaljerede kort, ofte mere præcise end kommercielle kort i mindre kortlagte områder. Universal Maps opdaterer sine data fra OpenStreetMap hver anden uge, så kortene altid er aktuelle og pålidelige. Hvis du bemærker, at noget mangler, kan du tilføje det til OpenStreetMap og hjælpe med at forbedre kortet for alle.
+
+<b>PRIVATLIV:</b> Vi indsamler ingen data eller identifikatorer. Det betyder ingen risiko for datalæk og ingen forstyrrelser som reklamer eller påtrængende notifikationer – kun en ren, privat kortoplevelse.
+
+<b>VIGTIGE FUNKTIONER</b>
+
+<b>UDFORSK STEDER:</b> Søg efter adresse, navn eller kategori, opdag millioner af interessepunkter, og se detaljer som åbningstider, Wikipedia-artikler, kørestolsadgang og andre nyttige oplysninger.
+
+<b>GPS-NAVIGATION:</b> Nyd stemmevejledt sving-for-sving-navigation. Opret gå-, vandre-, cykel- eller køreruter – også mellem byer og lande og med flere mellemstop. Find de bedste ruter med offentlig transport til ture og daglig pendling. Android Auto understøttes.
+
+<b>VANDRE- & CYKELRUTER FRA HELE VERDEN:</b> Aktivér særlige kortlag for at finde populære vandre- og cykelruter fra hele verden, alle hentet fra OpenStreetMap. Skift mellem lag for at se farvede cykel- og MTB-ruter samt officielle vandrestier.
+
+<b>3D-TERRÆN & DYBDER:</b> Udforsk bjerghøjder, havdybder og detaljerede højdekurver. Tryk hvor som helst på kortet for at se højden.
+
+<b>OFFENTLIG TRANSPORT:</b> Planlæg ruter med offentlig transport – metro, letbane, bus og sporvogn. Se rutenumre på stoppesteder.
+
+<b>KORTSTILE:</b> Vælg kortlag, der passer til din aktivitet – Udendørs, Højdekurver, Vandring, Cykling eller Metro.
+
+<b>RUTEOPTAGER:</b> Optag, importer, eksporter og del dine ruter og yndlingssteder. Understøtter KML-, KMZ-, GPX- og GeoJSON-formater.
+
+<b>WIKIPEDIA-ARTIKLER:</b> Læs Wikipedia-artikler om steder, du finder på kortet. Skriv “?wiki” i søgningen for at finde alle steder med tilknyttede artikler.
+
+<b>KORTREDIGERING:</b> Bidrag til OpenStreetMap ved at tilføje manglende steder eller redigere kortet direkte fra Universal Maps.
+
+<b>MØRK TILSTAND:</b> Skift til mørk tilstand for komfortabel visning om natten.
+
+Prøv appen – den er 100 % gratis, uden reklamer, hurtig og fuldstændig offline.
+
+Universal Maps er et uafhængigt, community-drevet open source-projekt med hundredvis af bidragydere, der hjælper med at udvikle nye funktioner, rette fejl, oversætte og føre projektet fremad.
+
+Se andre måder at støtte projektet på: https://github.com/yashhasan570/UniversalMaps/contribute/
+
+Har du spørgsmål? Besøg hjemmesiden universalmaps.app for flere oplysninger og FAQ.
+
+Instagram: @universalmaps.app
+Telegram: @UniversalMapsApp

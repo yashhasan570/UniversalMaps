@@ -1,0 +1,63 @@
+package com.universalmaps.app.car.screens.download;
+
+import android.text.TextUtils;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import com.universalmaps.app.sdk.downloader.CountryItem;
+import com.universalmaps.app.sdk.downloader.MapManager;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+public final class DownloaderHelpers
+{
+  static final String[] WORLD_MAPS = new String[] {"World", "WorldCoasts"};
+
+  // World maps may be missing only in the F-Droid build.
+  @SuppressWarnings("ConstantConditions")
+  public static boolean isWorldMapsDownloadNeeded(@NonNull final String flavor)
+  {
+    if ("fdroid".equals(flavor))
+      return !CountryItem.fill(WORLD_MAPS[0]).present || !CountryItem.fill(WORLD_MAPS[1]).present;
+    return false;
+  }
+
+  @NonNull
+  static List<CountryItem> getCountryItemsFromIds(@Nullable final String[] countryIds)
+  {
+    final List<CountryItem> countryItems = new ArrayList<>();
+    if (countryIds != null)
+    {
+      for (final String countryId : countryIds)
+        countryItems.add(CountryItem.fill(countryId));
+    }
+
+    return countryItems;
+  }
+
+  static long getMapsSize(@NonNull final Collection<CountryItem> countries, boolean withTerrain)
+  {
+    final String[] countryIds = new String[countries.size()];
+    int index = 0;
+    for (final CountryItem item : countries)
+      countryIds[index++] = item.id;
+    // Include the downloads already queued by another flow, like the phone routing dialog.
+    return MapManager.nativeGetRemainingDownloadSize(countryIds, withTerrain);
+  }
+
+  @NonNull
+  static String getCountryName(@NonNull CountryItem country)
+  {
+    boolean hasParent = !CountryItem.isRoot(country.topmostParentId) && !TextUtils.isEmpty(country.topmostParentName);
+    final StringBuilder sb = new StringBuilder();
+    if (hasParent)
+    {
+      sb.append(country.topmostParentName);
+      sb.append(" • ");
+    }
+    sb.append(country.name);
+    return sb.toString();
+  }
+
+  private DownloaderHelpers() {}
+}

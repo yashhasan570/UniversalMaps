@@ -1,0 +1,268 @@
+package com.universalmaps.app.routing;
+
+import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.res.TypedArray;
+import android.view.LayoutInflater;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.appcompat.content.res.AppCompatResources;
+import androidx.recyclerview.widget.RecyclerView;
+import com.universalmaps.app.R;
+import com.universalmaps.app.sdk.routing.RouteMarkData;
+import com.universalmaps.app.sdk.routing.RouteMarkType;
+import com.universalmaps.app.sdk.util.Assert;
+import com.universalmaps.app.util.ThemeUtils;
+import com.universalmaps.app.util.UiUtils;
+import java.util.ArrayList;
+import java.util.Arrays;
+
+public class ManageRouteAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
+{
+  private final Context mContext;
+  private final ArrayList<RouteMarkData> mRoutePoints;
+  private final ManageRouteListener mManageRouteListener;
+  private static final int TYPE_POINT = 0;
+  static final int TYPE_ADD_BUTTON = 1;
+  public interface ManageRouteListener
+  {
+    void startDrag(RecyclerView.ViewHolder viewHolder);
+    void onRoutePointDeleted(RecyclerView.ViewHolder viewHolder);
+    void onAddStopButtonClicked();
+    void onRoutePointClicked(int position);
+    void onPartialSlotClicked(@NonNull RouteMarkType type);
+    void onPartialSlotReplaceClicked(@NonNull RouteMarkType realType);
+  }
+
+  private boolean isPartial()
+  {
+    return mRoutePoints.size() < 2;
+  }
+
+  private boolean isPlaceholderAt(int position)
+  {
+    if (!isPartial())
+      return false;
+    if (mRoutePoints.isEmpty())
+      return true;
+    final RouteMarkType realType = mRoutePoints.get(0).mPointType;
+    final RouteMarkType slotType = (position == 0) ? RouteMarkType.Start : RouteMarkType.Finish;
+    return realType != slotType;
+  }
+
+  public ManageRouteAdapter(Context context, RouteMarkData[] routeMarkData, ManageRouteListener listener)
+  {
+    mContext = context;
+    mRoutePoints = new ArrayList<>(Arrays.asList(routeMarkData));
+    mManageRouteListener = listener;
+  }
+
+  @NonNull
+  @Override
+  public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType)
+  {
+    final LayoutInflater inflater = LayoutInflater.from(parent.getContext());
+    if (viewType == TYPE_ADD_BUTTON)
+      return new AddStopViewHolder(inflater.inflate(R.layout.manage_route_add_stop_item, parent, false));
+    return new ManageRouteViewHolder(inflater.inflate(R.layout.manage_route_list_item, parent, false));
+  }
+
+  @Override
+  public int getItemViewType(int position)
+  {
+    if (isPartial())
+      return TYPE_POINT;
+    return (position == mRoutePoints.size()) ? TYPE_ADD_BUTTON : TYPE_POINT;
+  }
+
+  @SuppressLint("ClickableViewAccessibility")
+  @Override
+  public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position)
+  {
+    if (holder instanceof AddStopViewHolder)
+    {
+      holder.itemView.setOnClickListener((v) -> { mManageRouteListener.onAddStopButtonClicked(); });
+      return;
+    }
+    if (!(holder instanceof ManageRouteViewHolder pointHolder))
+      return;
+
+    pointHolder.mImageViewDelete.setOnClickListener(v -> mManageRouteListener.onRoutePointDeleted(pointHolder));
+    if (isPartial())
+    {
+      bindPartialSlot(pointHolder, position);
+      return;
+    }
+
+    int iconId;
+    switch (mRoutePoints.get(position).mPointType)
+    {
+    case Start:
+      if (mRoutePoints.get(position).mIsMyPosition)
+        iconId = R.drawable.ic_location_arrow_blue;
+      else
+        iconId = R.drawable.route_point_start;
+      break;
+    case Intermediate:
+      TypedArray iconArray = mContext.getResources().obtainTypedArray(R.array.route_stop_icons);
+      // The last item is the generic marker for stops beyond the numbered drawables.
+      final int stopIndex = Math.min(mRoutePoints.get(position).mIntermediateIndex, iconArray.length() - 1);
+      iconId = iconArray.getResourceId(stopIndex, R.drawable.route_point_20);
+      iconArray.recycle();
+      break;
+    case Finish: iconId = R.drawable.route_point_finish; break;
+    default: iconId = R.drawable.warning_icon; break;
+    }
+    pointHolder.mImageViewIcon.setImageDrawable(AppCompatResources.getDrawable(mContext, iconId));
+    String title;
+    if (mRoutePoints.get(position).mIsMyPosition)
+    {
+      title = mContext.getString(com.universalmaps.app.sdk.R.string.core_my_position);
+    }
+    else
+    {
+      title = mRoutePoints.get(position).mTitle;
+    }
+    pointHolder.mTextViewTitle.setText(title);
+    pointHolder.mTextViewTitle.setTextColor(ThemeUtils.getColor(mContext, android.R.attr.textColorPrimary));
+    UiUtils.show(pointHolder.mImageViewDrag, pointHolder.mImageViewDelete);
+    pointHolder.itemView.setOnClickListener(
+        v -> { mManageRouteListener.onRoutePointClicked(pointHolder.getBindingAdapterPosition()); });
+
+    // touch listener on drag handle to initiate drag !
+    pointHolder.mImageViewDrag.setOnTouchListener((v, event) -> {
+      if (event.getAction() == MotionEvent.ACTION_DOWN)
+      {
+        mManageRouteListener.startDrag(pointHolder);
+        return true;
+      }
+      return false;
+    });
+  }
+
+  private void bindPartialSlot(@NonNull ManageRouteViewHolder pointHolder, int position)
+  {
+    final RouteMarkType slotType = (position == 0) ? RouteMarkType.Start : RouteMarkType.Finish;
+    final boolean isPlaceholder = isPlaceholderAt(position);
+    final int iconId = (slotType == RouteMarkType.Start) ? R.drawable.route_point_start : R.drawable.route_point_finish;
+    pointHolder.mImageViewIcon.setImageDrawable(AppCompatResources.getDrawable(mContext, iconId));
+
+    final String title;
+    if (isPlaceholder)
+    {
+      title = mContext.getString(slotType == RouteMarkType.Start ? R.string.p2p_from_here : R.string.p2p_to_here);
+    }
+    else
+    {
+      final RouteMarkData point = mRoutePoints.get(0);
+      title = point.mIsMyPosition ? mContext.getString(com.universalmaps.app.sdk.R.string.core_my_position) : point.mTitle;
+    }
+    pointHolder.mTextViewTitle.setText(title);
+    final int titleColorAttr = isPlaceholder ? android.R.attr.textColorSecondary : android.R.attr.textColorPrimary;
+    pointHolder.mTextViewTitle.setTextColor(ThemeUtils.getColor(mContext, titleColorAttr));
+
+    UiUtils.hide(pointHolder.mImageViewDrag);
+    pointHolder.mImageViewDrag.setOnTouchListener(null);
+    UiUtils.showIf(!isPlaceholder, pointHolder.mImageViewDelete);
+
+    if (isPlaceholder)
+    {
+      pointHolder.itemView.setOnClickListener(v -> mManageRouteListener.onPartialSlotClicked(slotType));
+    }
+    else
+    {
+      final RouteMarkType realType = mRoutePoints.get(0).mPointType;
+      pointHolder.itemView.setOnClickListener(v -> mManageRouteListener.onPartialSlotReplaceClicked(realType));
+    }
+  }
+
+  @Override
+  public int getItemCount()
+  {
+    if (isPartial())
+      return 2;
+    return mRoutePoints.size() + 1;
+  }
+
+  public void moveRoutePoint(@NonNull RecyclerView.ViewHolder draggedItem, @NonNull RecyclerView.ViewHolder targetItem)
+  {
+    final int draggedItemIndex = draggedItem.getBindingAdapterPosition();
+    final int targetIndex = targetItem.getBindingAdapterPosition();
+    if (draggedItemIndex == targetIndex) // Dragged to the same spot, nothing to reorder.
+      return;
+    mRoutePoints.add(targetIndex, mRoutePoints.remove(draggedItemIndex));
+    updateRoutePointsData();
+    notifyItemMoved(draggedItemIndex, targetIndex);
+  }
+
+  private void updateRoutePointsData()
+  {
+    Assert.debug(mRoutePoints.size() >= 2, "There must be at least two route points");
+
+    // Set starting point.
+    mRoutePoints.get(0).mPointType = RouteMarkType.Start;
+    // Set finish point.
+    mRoutePoints.get(mRoutePoints.size() - 1).mPointType = RouteMarkType.Finish;
+    // Set intermediate point(s).
+    for (int pos = 1; pos < mRoutePoints.size() - 1; pos++)
+    {
+      mRoutePoints.get(pos).mPointType = RouteMarkType.Intermediate;
+      mRoutePoints.get(pos).mIntermediateIndex = pos - 1;
+    }
+  }
+
+  public ArrayList<RouteMarkData> getRoutePoints()
+  {
+    return mRoutePoints;
+  }
+
+  @NonNull
+  public RouteMarkData getRoutePointAt(int position)
+  {
+    return mRoutePoints.get(isPartial() ? 0 : position);
+  }
+
+  // Resync the existing adapter with the native route points, keeping the same adapter/touch-helper instances.
+  public void setRoutePoints(@NonNull RouteMarkData[] routePoints)
+  {
+    mRoutePoints.clear();
+    mRoutePoints.addAll(Arrays.asList(routePoints));
+    notifyDataSetChanged();
+  }
+
+  static class ManageRouteViewHolder extends RecyclerView.ViewHolder
+  {
+    @NonNull
+    public final ImageView mImageViewIcon;
+
+    @NonNull
+    public final TextView mTextViewTitle;
+
+    @NonNull
+    public final ImageView mImageViewDelete;
+
+    @NonNull
+    public final ImageView mImageViewDrag;
+
+    ManageRouteViewHolder(@NonNull View itemView)
+    {
+      super(itemView);
+      mImageViewIcon = itemView.findViewById(R.id.type_icon);
+      mTextViewTitle = itemView.findViewById(R.id.title);
+      mImageViewDelete = itemView.findViewById(R.id.delete_icon);
+      mImageViewDrag = itemView.findViewById(R.id.drag_icon);
+    }
+  }
+
+  static class AddStopViewHolder extends RecyclerView.ViewHolder
+  {
+    AddStopViewHolder(@NonNull View itemView)
+    {
+      super(itemView);
+    }
+  }
+}

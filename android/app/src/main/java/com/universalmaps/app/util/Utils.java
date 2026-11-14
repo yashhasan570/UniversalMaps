@@ -1,0 +1,538 @@
+package com.universalmaps.app.util;
+
+import static com.universalmaps.app.sdk.util.Utils.dimen;
+import static com.universalmaps.app.sdk.util.Utils.isIntentSupported;
+
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.text.Html;
+import android.text.Spannable;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.TextUtils;
+import android.text.style.AbsoluteSizeSpan;
+import android.util.AndroidRuntimeException;
+import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.annotation.DimenRes;
+import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
+import androidx.core.app.NavUtils;
+import androidx.core.os.BundleCompat;
+import androidx.fragment.app.Fragment;
+import com.universalmaps.app.BuildConfig;
+import com.universalmaps.app.MwmActivity;
+import com.universalmaps.app.MwmApplication;
+import com.universalmaps.app.R;
+import com.universalmaps.app.sdk.util.Config;
+import com.universalmaps.app.sdk.util.Constants;
+import com.universalmaps.app.sdk.util.Distance;
+import com.universalmaps.app.sdk.util.concurrency.UiThread;
+import com.universalmaps.app.sdk.util.log.Logger;
+import com.universalmaps.app.sdk.util.log.LogsManager;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.snackbar.Snackbar;
+import java.lang.ref.WeakReference;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+@Keep
+public class Utils
+{
+  private static final String TAG = Utils.class.getSimpleName();
+
+  @StringRes
+  public static final int INVALID_ID = 0;
+  public static final String UTF_8 = "utf-8";
+  public static final String TEXT_HTML = "text/html; charset=utf-8";
+  public static final String ZIP_MIME_TYPE = "application/x-zip";
+  public static final String EMAIL_MIME_TYPE = "message/rfc822";
+
+  private Utils() {}
+
+  public static void showBatteryOptimizationWarningIfNeeded(@NonNull Activity activity)
+  {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
+      return;
+
+    final SharedPreferences prefs = activity.getSharedPreferences("UniversalMapsPrefs", Context.MODE_PRIVATE);
+    if (prefs.getBoolean("battery_optimization_warning_seen", false))
+      return;
+
+    new MaterialAlertDialogBuilder(activity, R.style.MwmTheme_AlertDialog)
+        .setTitle(R.string.background_recording_warning_title)
+        .setMessage(R.string.background_recording_warning_message)
+        .setPositiveButton(R.string.settings, (dialog, which) -> openBatteryOptimizationSettings(activity))
+        .setNegativeButton(R.string.not_now, null)
+        .show();
+    prefs.edit().putBoolean("battery_optimization_warning_seen", true).apply();
+  }
+
+  private static void openBatteryOptimizationSettings(@NonNull Activity activity)
+  {
+    final List<Intent> intents = new ArrayList<>();
+    if ("samsung".equalsIgnoreCase(Build.MANUFACTURER))
+    {
+      // https://developer.samsung.com/mobile/app-management.html
+      intents.add(new Intent("com.samsung.android.sm.ACTION_OPEN_CHECKABLE_LISTACTIVITY")
+                      .setPackage("com.samsung.android.lool")
+                      .putExtra("activity_type", 2)); // Never sleeping apps.
+    }
+    intents.add(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+    intents.add(new Intent(Settings.ACTION_SETTINGS));
+    for (final Intent intent : intents)
+    {
+      try
+      {
+        activity.startActivity(intent);
+        return;
+      }
+      catch (ActivityNotFoundException | SecurityException e)
+      {
+        Logger.w(TAG, "Failed to open battery settings: " + intent, e);
+      }
+    }
+  }
+
+  /**
+   * Enable to keep screen on.
+   * Disable to let system turn it off automatically.
+   */
+  public static void keepScreenOn(boolean enable, Window w)
+  {
+    Logger.i(TAG, "KeepScreenOn = " + enable + " window = " + w);
+    if (enable)
+      w.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    else
+      w.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+  }
+
+  private static void showOnLockScreenOld(boolean enable, Activity activity)
+  {
+    if (enable)
+      activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+    else
+      activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+  }
+
+  public static void showOnLockScreen(boolean enable, Activity activity)
+  {
+    Logger.i(TAG, "showOnLockScreen = " + enable + " window = " + activity.getWindow());
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1)
+      showOnLockScreenOld(enable, activity);
+    else
+      activity.setShowWhenLocked(enable);
+  }
+
+  public static void showSnackbar(@NonNull View view, @NonNull String message)
+  {
+    Snackbar snackbar = Snackbar.make(view, message, Snackbar.LENGTH_LONG);
+    setSnackbarMaxLines(snackbar, 3);
+    snackbar.show();
+  }
+
+  public static void showSnackbarAbove(@NonNull View view, @NonNull View viewAbove, @NonNull String message)
+  {
+    Snackbar snackbar = Snackbar.make(view, message, Snackbar.LENGTH_LONG);
+    setSnackbarMaxLines(snackbar, 3);
+    snackbar.setAnchorView(viewAbove);
+    snackbar.show();
+  }
+
+  private static void setSnackbarMaxLines(@NonNull final Snackbar snackbar, final int maxLinesCount)
+  {
+    TextView snackTextView = snackbar.getView().findViewById(com.google.android.material.R.id.snackbar_text);
+    snackTextView.setMaxLines(maxLinesCount);
+  }
+
+  public static void showSnackbar(@NonNull Context context, @NonNull View view, int messageResId)
+  {
+    showSnackbar(context, view, null, messageResId);
+  }
+
+  public static void showSnackbar(@NonNull Context context, @NonNull View view, @Nullable View viewAbove,
+                                  int messageResId)
+  {
+    final String message = context.getString(messageResId);
+    if (viewAbove == null)
+      showSnackbar(view, message);
+    else
+      showSnackbarAbove(view, viewAbove, message);
+  }
+
+  public static @Nullable Intent makeSystemLocationSettingIntent(@NonNull Context context)
+  {
+    Intent intent = new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+    if (isIntentSupported(context, intent))
+      return intent;
+    intent = new Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS);
+    if (isIntentSupported(context, intent))
+      return intent;
+    intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+    Uri uri = Uri.fromParts("package", context.getPackageName(), null);
+    intent.setData(uri);
+    if (isIntentSupported(context, intent))
+      return intent;
+    return null;
+  }
+
+  public static void checkNotNull(Object object)
+  {
+    if (null == object)
+      throw new NullPointerException("Argument here must not be NULL");
+  }
+
+  public static void copyTextToClipboard(Context context, String text)
+  {
+    final android.content.ClipboardManager clipboard =
+        (android.content.ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+    final ClipData clip = ClipData.newPlainText("Universal Maps: " + text, text);
+    clipboard.setPrimaryClip(clip);
+  }
+  public static Uri buildMailUri(String to, String subject, String body)
+  {
+    String uriString = Constants.Url.MAILTO_SCHEME + Uri.encode(to) + Constants.Url.MAIL_SUBJECT + Uri.encode(subject)
+                     + Constants.Url.MAIL_BODY + Uri.encode(body);
+
+    return Uri.parse(uriString);
+  }
+
+  public static void openAppInMarket(Activity activity, String url)
+  {
+    final Intent marketIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+    marketIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+    marketIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+
+    try
+    {
+      activity.startActivity(marketIntent);
+    }
+    catch (ActivityNotFoundException e)
+    {
+      Logger.w(TAG, "Failed to start activity", e);
+    }
+  }
+
+  /*
+   * Check if WebBrowser intent could be opened.
+   */
+  public static boolean isBrowserAvailable(Context context)
+  {
+    final Intent intent = new Intent(Intent.ACTION_VIEW);
+    intent.setData(Uri.parse("https://osm.org"));
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    intent.addCategory(Intent.CATEGORY_BROWSABLE);
+
+    // Check that an app exists to open URL
+    return intent.resolveActivity(context.getPackageManager()) != null;
+  }
+
+  public static void showFacebookPage(Activity activity)
+  {
+    try
+    {
+      // Exception is thrown if we don't have installed Facebook application.
+      getPackageInfo(activity.getPackageManager(), Constants.Package.FB_PACKAGE, 0);
+      activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(Constants.Url.FB_OM_COMMUNITY_NATIVE)));
+    }
+    catch (final Exception e)
+    {
+      activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(Constants.Url.FB_OM_COMMUNITY_HTTP)));
+    }
+  }
+
+  public static void openUrl(@NonNull Context context, @Nullable String url)
+  {
+    if (TextUtils.isEmpty(url))
+      return;
+
+    Uri uri =
+        isHttpOrHttpsScheme(url) ? Uri.parse(url) : new Uri.Builder().scheme("http").appendEncodedPath(url).build();
+
+    Utils.openUri(context, uri, R.string.browser_not_available);
+  }
+
+  /**
+   * Attempts to open a URI in another app via the system app chooser.
+   * @param context the app context
+   * @param uri the URI to open.
+   * @param failMessage string id: message to show in a toast when the system can't find an app to open with.
+   */
+  public static void openUri(@NonNull Context context, @NonNull Uri uri, @Nullable Integer failMessage)
+  {
+    final Intent intent = new Intent(Intent.ACTION_VIEW);
+    intent.setData(uri);
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    intent.addCategory(Intent.CATEGORY_BROWSABLE);
+
+    try
+    {
+      context.startActivity(intent);
+    }
+    catch (ActivityNotFoundException e)
+    {
+      if (failMessage != null)
+        Toast.makeText(context, context.getString(failMessage), Toast.LENGTH_LONG).show();
+      Logger.w(TAG, "ActivityNotFoundException", e);
+    }
+  }
+
+  private static boolean isHttpOrHttpsScheme(@NonNull String url)
+  {
+    return url.startsWith("http://") || url.startsWith("https://");
+  }
+
+  // subject is optional (could be an empty string).
+
+  /**
+   * @param subject could be an empty string
+   */
+  public static void sendBugReport(@NonNull ActivityResultLauncher<SharingUtils.SharingIntent> launcher,
+                                   @NonNull Activity activity, @NonNull String subject, @NonNull String body)
+  {
+    subject = "Universal Maps Bugreport" + (TextUtils.isEmpty(subject) ? "" : ": " + subject);
+    LogsManager.INSTANCE.zipLogs(
+        new SupportInfoWithLogsCallback(launcher, activity, subject, body, BuildConfig.SUPPORT_MAIL));
+  }
+
+  // TODO: Don't send logs with general feedback, send system information only (version, device name, connectivity,
+  // etc.)
+  public static void sendFeedback(@NonNull ActivityResultLauncher<SharingUtils.SharingIntent> launcher,
+                                  @NonNull Activity activity)
+  {
+    LogsManager.INSTANCE.zipLogs(
+        new SupportInfoWithLogsCallback(launcher, activity, "Universal Maps Feedback", "", BuildConfig.SUPPORT_MAIL));
+  }
+
+  public static void navigateToParent(@NonNull Activity activity)
+  {
+    if (activity instanceof MwmActivity)
+      ((MwmActivity) activity).customOnNavigateUp();
+    else
+      NavUtils.navigateUpFromSameTask(activity);
+  }
+
+  public static SpannableStringBuilder formatTime(Context context, @DimenRes int size, @DimenRes int units,
+                                                  String dimension, String unitText)
+  {
+    final SpannableStringBuilder res = new SpannableStringBuilder(dimension).append("\u00A0").append(unitText);
+    res.setSpan(new AbsoluteSizeSpan(dimen(context, size), false), 0, dimension.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    res.setSpan(new AbsoluteSizeSpan(dimen(context, units), false), dimension.length(), res.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    return res;
+  }
+
+  @NonNull
+  public static Spannable formatDistance(Context context, @NonNull Distance distance)
+  {
+    final SpannableStringBuilder res = new SpannableStringBuilder(distance.toString(context));
+    res.setSpan(new AbsoluteSizeSpan(dimen(context, R.dimen.text_size_nav_number), false), 0,
+                distance.mDistanceStr.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    res.setSpan(new AbsoluteSizeSpan(dimen(context, R.dimen.text_size_nav_dimension), false),
+                distance.mDistanceStr.length(), res.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    return res;
+  }
+
+  public static void sendTo(@NonNull Context context, @NonNull String email)
+  {
+    sendTo(context, email, "", "");
+  }
+
+  public static void sendTo(@NonNull Context context, @NonNull String email, @NonNull String subject)
+  {
+    sendTo(context, email, subject, "");
+  }
+
+  public static void sendTo(@NonNull Context context, @NonNull String email, @NonNull String subject,
+                            @NonNull String body)
+  {
+    Intent intent = new Intent(Intent.ACTION_SENDTO);
+    intent.setData(Utils.buildMailUri(email, subject, body));
+    context.startActivity(intent);
+  }
+
+  public static void callPhone(@NonNull Context context, @NonNull String phone)
+  {
+    Intent intent = new Intent(Intent.ACTION_DIAL);
+    intent.setData(Uri.parse("tel:" + phone));
+    try
+    {
+      context.startActivity(intent);
+    }
+    catch (ActivityNotFoundException e)
+    {
+      Logger.w(TAG, "Failed to call phone", e);
+    }
+  }
+
+  public static void detachFragmentIfCoreNotInitialized(@NonNull Context context, @NonNull Fragment fragment)
+  {
+    if (MwmApplication.from(context).getUniversalMaps().arePlatformAndCoreInitialized())
+      return;
+
+    if (!fragment.isAdded())
+      return;
+
+    fragment.getParentFragmentManager().beginTransaction().detach(fragment).commit();
+  }
+  public static String getLocalizedLevel(@NonNull Context context, @Nullable String level)
+  {
+    if (TextUtils.isEmpty(level))
+      return "";
+    return context.getString(R.string.level_value_generic, level);
+  }
+
+  private static class SupportInfoWithLogsCallback implements LogsManager.OnZipCompletedListener
+  {
+    @NonNull
+    ActivityResultLauncher<SharingUtils.SharingIntent> mLauncher;
+    @NonNull
+    private final WeakReference<Activity> mActivityRef;
+    @NonNull
+    private final String mSubject;
+    @NonNull
+    private final String mBody;
+    @NonNull
+    private final String mEmail;
+
+    private SupportInfoWithLogsCallback(@NonNull ActivityResultLauncher<SharingUtils.SharingIntent> launcher,
+                                        @NonNull Activity activity, @NonNull String subject, @NonNull String body,
+                                        @NonNull String email)
+    {
+      mActivityRef = new WeakReference<>(activity);
+      mSubject = subject;
+      mBody = body;
+      mEmail = email;
+      mLauncher = launcher;
+    }
+
+    @Override
+    public void onCompleted(final boolean success, @Nullable final String zipPath)
+    {
+      // TODO: delete zip file after its sent.
+      UiThread.run(() -> {
+        final Activity activity = mActivityRef.get();
+        if (activity == null)
+          return;
+
+        SharingUtils.ShareInfo info = new SharingUtils.ShareInfo();
+
+        info.mMail = mEmail;
+        info.mSubject = "[" + BuildConfig.VERSION_NAME + "] " + mSubject;
+        info.mText = mBody;
+
+        if (success)
+        {
+          info.mFileName = zipPath;
+          info.mMimeType = ZIP_MIME_TYPE;
+        }
+        else
+        {
+          info.mMimeType = EMAIL_MIME_TYPE;
+        }
+
+        SharingUtils.shareFile(activity.getApplicationContext(), mLauncher, info);
+      });
+    }
+  }
+
+  public static <T> T getParcelable(@NonNull Bundle in, @Nullable String key, @NonNull Class<T> clazz)
+  {
+    in.setClassLoader(clazz.getClassLoader());
+    return BundleCompat.getParcelable(in, key, clazz);
+  }
+
+  @SuppressWarnings("deprecation")
+  private static Spanned fromHtmlOld(@NonNull String htmlDescription)
+  {
+    return Html.fromHtml(htmlDescription);
+  }
+
+  public static Spanned fromHtml(@NonNull String htmlDescription)
+  {
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.N)
+      return fromHtmlOld(htmlDescription);
+    return Html.fromHtml(htmlDescription, Html.FROM_HTML_MODE_LEGACY);
+  }
+
+  @SuppressWarnings("deprecation")
+  private static PackageInfo getPackageInfoOld(@NonNull PackageManager manager, @NonNull String packageName, int flags)
+      throws PackageManager.NameNotFoundException
+  {
+    return manager.getPackageInfo(packageName, flags);
+  }
+
+  public static PackageInfo getPackageInfo(@NonNull PackageManager manager, @NonNull String packageName, int flags)
+      throws PackageManager.NameNotFoundException
+  {
+    if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
+      return getPackageInfoOld(manager, packageName, flags);
+    return manager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(flags));
+  }
+
+  /**
+   * Nearest minute (half up), with a one-minute minimum, for labels that show hours and minutes separately.
+   * Keep in sync with platform::Duration::GetRoutingString(), which formats the route preview and balloons.
+   */
+  public static long getRoutingMinutes(int seconds)
+  {
+    assert seconds >= 0 : seconds;
+    return Math.max(1, (seconds + 30L) / 60);
+  }
+
+  @NonNull
+  public static CharSequence formatDuration(Context context, int seconds, @DimenRes int unitsSize)
+  {
+    int textSize = R.dimen.text_size_routing_number;
+    long minutes = TimeUnit.SECONDS.toMinutes(seconds) % 60;
+    long hours = TimeUnit.SECONDS.toHours(seconds);
+    CharSequence displayedM =
+        formatTime(context, textSize, unitsSize, String.valueOf(minutes), context.getString(R.string.minute));
+    if (hours == 0)
+      return displayedM;
+    return TextUtils.concat(
+        formatTime(context, textSize, unitsSize, String.valueOf(hours), context.getString(R.string.hour)), "\u00A0",
+        displayedM);
+  }
+
+  @NonNull
+  public static String formatArrivalTime(@NonNull Context context, int seconds)
+  {
+    // Add elapsed time on the timeline so arrival clocks account for daylight-saving transitions.
+    final Date arrival = Date.from(Instant.now().plusSeconds(seconds));
+    return android.text.format.DateFormat.getTimeFormat(context).format(arrival);
+  }
+
+  @NonNull
+  public static String getDonateUrl(@NonNull Context context)
+  {
+    // The same l11n logic as in Framework::GetDonateUrl()
+
+    final String url = Config.getDonateUrl();
+    // Enable donations by default if not Google or Huawei. Replace universalmaps.app/donate/ with localized page.
+    if ((url.isEmpty() && !BuildConfig.FLAVOR.equals("google") && !BuildConfig.FLAVOR.equals("huawei"))
+        || url.endsWith("universalmaps.app/donate/"))
+      return context.getString(R.string.translated_om_site_url) + "donate/";
+    return url;
+  }
+}

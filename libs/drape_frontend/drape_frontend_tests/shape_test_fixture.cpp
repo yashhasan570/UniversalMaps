@@ -1,0 +1,285 @@
+#include "drape_frontend/drape_frontend_tests/shape_test_fixture.hpp"
+
+#include "drape_frontend/shape_view_params.hpp"
+#include "drape_frontend/visual_params.hpp"
+
+#include "drape/gl_functions.hpp"
+#include "drape/gl_includes.hpp"
+#include "drape/support_manager.hpp"
+#include "drape/utils/projection.hpp"
+
+#include "qt_tstfrm/test_main_loop.hpp"
+
+#include "platform/platform.hpp"
+
+#include "base/file_name_utils.hpp"
+#include "base/scope_guard.hpp"
+
+#include <QtGui/QPainter>
+
+#include <algorithm>
+#include <cstdlib>
+#include <optional>
+
+namespace df::test_support
+{
+namespace
+{
+uint32_t constexpr kBatchSize = 5000;
+}  // namespace
+
+void CurrentOGLContext::Present()
+{
+  GLFunctions::glFinish();
+}
+
+void InitTextureManager(ref_ptr<dp::GraphicsContext> context, dp::TextureManager & texMng)
+{
+  dp::TextureManager::Params texParams;
+  texParams.m_resPostfix = df::VisualParams::GetResourcePostfix(1.0);
+  texParams.m_visualScale = 1.0;
+  texParams.m_colors = "colors.txt";
+  texParams.m_patterns = "patterns.txt";
+  texParams.m_glyphMngParams.m_uniBlocks = base::JoinPath("fonts", "unicode_blocks.txt");
+  texParams.m_glyphMngParams.m_whitelist = base::JoinPath("fonts", "whitelist.txt");
+  texParams.m_glyphMngParams.m_blacklist = base::JoinPath("fonts", "blacklist.txt");
+  GetPlatform().GetFontNames(texParams.m_glyphMngParams.m_fonts);
+  texMng.Init(context, texParams);
+}
+
+void ShapeTestFixture::Render(char const * title, uint32_t width, uint32_t height, ShapeCreatorFn const & createShapes)
+{
+  RunTestInOpenGLOffscreenEnvironment(title, [&]()
+  {
+    SCOPE_GUARD(releaseResources, [this] { ReleaseGLResources(); });
+    Init(width, height);
+
+    createShapes(*this);
+
+    Flush();
+    Render();
+  });
+
+  CHECK(!m_lastImage.isNull(), ("OpenGL render produced no image", title));
+
+  RunTestLoop(title, [this](QPaintDevice * device)
+  {
+    QPainter painter(device);
+    painter.fillRect(QRectF(0, 0, device->width(), device->height()), Qt::darkGray);
+    painter.drawImage(0, 0, m_lastImage);
+  }, true /* autoExit */);  // pass false if you need to inspect locally
+}
+
+void ShapeTestFixture::ReleaseGLResources()
+{
+  m_buckets.clear();
+  m_batcher.reset();
+  m_texMng.reset();
+  m_progMng.reset();
+
+  m_framebuffer.reset();
+
+  m_context.reset();
+}
+
+void ShapeTestFixture::Init(uint32_t width, uint32_t height)
+{
+  m_width = width;
+  m_height = height;
+
+  // Assumes a GL context is already current (from RunTestInOpenGLOffscreenEnvironment).
+  auto ctx = std::make_unique<CurrentOGLContext>();
+  ctx->Init(dp::ApiVersion::OpenGLES3);
+
+  dp::SupportManager::Instance().Init(make_ref(ctx));
+
+  m_context = std::move(ctx);
+  auto const contextRef = make_ref(m_context);
+
+  // Offscreen render target: the same RGBA8 color plus depth framebuffer FrontendRenderer draws into.
+  m_framebuffer =
+      make_unique_dp<dp::Framebuffer>(dp::TextureFormat::RGBA8, true /* depthEnabled */, false /* stencilEnabled */);
+  m_framebuffer->SetSize(contextRef, width, height);
+  CHECK(m_framebuffer->IsSupported(), ("RGBA8 + depth FBO is incomplete"));
+
+  m_context->SetViewport(0, 0, width, height);
+  m_context->SetDepthTestEnabled(true);
+  m_context->SetCullingEnabled(true);
+
+  // Global GL state, applied once per context by FrontendRenderer::OnContextCreate. Without it GL keeps
+  // its default (GL_ONE, GL_ZERO) and every fragment overwrites the target, so shapes would be validated
+  // against raw fragment output instead of what actually reaches the screen.
+  dp::AlphaBlendingState::Apply(contextRef);
+
+  // Initialize ProgramManager (compiles all shaders).
+  m_progMng = std::make_unique<gpu::ProgramManager>();
+  m_progMng->Init(contextRef);
+
+  // Initialize TextureManager with real data.
+  m_texMng = std::make_unique<dp::TextureManager>();
+  InitTextureManager(contextRef, *m_texMng);
+
+  // Upload textures to GPU (creates hardware texture objects).
+  m_texMng->UpdateDynamicTextures(contextRef);
+
+  // Create batcher.
+  m_batcher = std::make_unique<dp::Batcher>(kBatchSize, kBatchSize);
+  m_batcher->StartSession([this](dp::RenderState const & state, drape_ptr<dp::RenderBucket> && bucket)
+  { m_buckets.push_back({state, std::move(bucket)}); });
+}
+
+void ShapeTestFixture::AddShape(drape_ptr<MapShape> && shape)
+{
+  CHECK(m_batcher != nullptr, ("Call Init() before AddShape()"));
+  shape->Draw(make_ref(m_context), make_ref(m_batcher), make_ref(m_texMng));
+}
+
+void ShapeTestFixture::AddUserLines(TileKey const & tileKey, TracksSource const & source,
+                                    UserLinesRenderCollection const & renderParams)
+{
+  CHECK(m_batcher != nullptr, ("Call Init() before AddUserLines()"));
+  CacheUserLines(make_ref(m_context), tileKey, make_ref(m_texMng), source, renderParams, *m_batcher);
+}
+
+void ShapeTestFixture::AddUserAreas(TileKey const & tileKey, UserAreasToCache const & areas)
+{
+  CHECK(m_batcher != nullptr, ("Call Init() before AddUserAreas()"));
+  auto const tileCenter = tileKey.GetGlobalRect().Center();
+  if (!m_viewCenter)
+    m_viewCenter = tileCenter;
+  auto const offset = (tileCenter - *m_viewCenter) * m_worldToPixelScale;
+  glsl::vec2 const shift(offset.x, -offset.y);
+
+  dp::Batcher batcher(kBatchSize, kBatchSize);
+  dp::SessionGuard guard(make_ref(m_context), batcher,
+                         [this, shift](dp::RenderState const & state, drape_ptr<dp::RenderBucket> && bucket)
+  { m_buckets.push_back({state, std::move(bucket), shift}); });
+  CacheUserAreas(make_ref(m_context), tileKey, make_ref(m_texMng), areas, batcher);
+}
+
+void ShapeTestFixture::Flush()
+{
+  CHECK(m_batcher != nullptr, ("Call Init() before Flush()"));
+  m_batcher->EndSession(make_ref(m_context));
+
+  // Upload any new texture data that was requested during AddShape (color/stipple regions).
+  m_texMng->UpdateDynamicTextures(make_ref(m_context));
+}
+
+void ShapeTestFixture::Render()
+{
+  auto const contextRef = make_ref(m_context);
+
+  m_framebuffer->Bind();
+  m_context->SetClearColor(m_backgroundColor);
+  m_context->Clear(dp::ClearBits::ColorBit | dp::ClearBits::DepthBit, 0);
+
+  // Coordinate pipeline:
+  //   world coords -> ToShapeVertex2: (world - tileCenter) * kShapeCoordScalar -> shape coords
+  //   shape coords -> modelView -> pixel coords (m_worldToPixelScale pixels per world unit, Y down as in production)
+  //   pixel coords -> projection -> NDC [-1, 1]
+  float const halfW = static_cast<float>(m_width) / 2.0f;
+  float const halfH = static_cast<float>(m_height) / 2.0f;
+  float const modelViewScale = m_worldToPixelScale / static_cast<float>(kShapeCoordScalar);
+
+  gpu::MapProgramParams params;
+  auto const projection = dp::MakeProjection(dp::ApiVersion::OpenGLES3, -halfW, halfW, halfH, -halfH);
+  params.m_projection = glsl::make_mat4(projection.data());
+  params.m_pivotTransform = glsl::mat4(1.0f);
+  params.m_opacity = 1.0f;
+  params.m_zScale = 1.0f;
+
+  // FrontendRenderer sorts render groups within each layer and clears depth between user-line passes.
+  std::ranges::stable_sort(m_buckets, [](auto const & lhs, auto const & rhs)
+  {
+    auto const leftLayer = GetDepthLayer(lhs.m_state);
+    auto const rightLayer = GetDepthLayer(rhs.m_state);
+    return leftLayer == rightLayer ? lhs.m_state < rhs.m_state : leftLayer < rightLayer;
+  });
+  std::optional<DepthLayer> layer;
+  for (auto & entry : m_buckets)
+  {
+    auto const nextLayer = GetDepthLayer(entry.m_state);
+    if (layer != nextLayer)
+    {
+      m_context->Clear(dp::ClearBits::DepthBit, dp::kClearBitsStoreAll);
+      layer = nextLayer;
+    }
+    auto const & shift = entry.m_tileShift;
+    params.m_modelView =
+        glsl::mat4(modelViewScale, 0, 0, shift.x, 0, -modelViewScale, 0, shift.y, 0, 0, 1, 0, 0, 0, 0, 1);
+    auto const programId = entry.m_state.GetProgram<gpu::Program>();
+    auto program = m_progMng->GetProgram(programId);
+    program->Bind();
+    dp::ApplyState(contextRef, program, entry.m_state);
+
+    entry.m_bucket->GetBuffer()->Build(contextRef, program);
+    m_progMng->GetParamsSetter()->Apply(contextRef, program, params);
+    entry.m_bucket->Render(contextRef, entry.m_state.GetDrawAsLine());
+  }
+
+  m_context->Flush();
+
+  // Read pixels from FBO.
+  std::vector<uint8_t> pixels(m_width * m_height * 4);
+  glReadPixels(0, 0, m_width, m_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+  // glReadPixels returns bottom-up; QImage expects top-down.
+  QImage img(m_width, m_height, QImage::Format_RGBA8888);
+  for (uint32_t y = 0; y < m_height; ++y)
+  {
+    uint8_t const * src = pixels.data() + (m_height - 1 - y) * m_width * 4;
+    memcpy(img.scanLine(y), src, m_width * 4);
+  }
+
+  m_lastImage = img;
+}
+
+bool ImagesEqual(char const * name, QImage const & actual, QImage const & expected)
+{
+  if (actual == expected)
+    return true;
+
+  ASSERT(actual.size() == expected.size(), (name));
+  QImage difference(actual.size(), QImage::Format_RGB32);
+  difference.fill(Qt::black);
+  uint32_t differentPixels = 0;
+  int maxChannelDifference = 0;
+  for (int y = 0; y < actual.height(); ++y)
+  {
+    for (int x = 0; x < actual.width(); ++x)
+    {
+      auto const actualPixel = actual.pixel(x, y);
+      auto const expectedPixel = expected.pixel(x, y);
+      if (actualPixel == expectedPixel)
+        continue;
+      if (differentPixels == 0)
+        LOG(LINFO, ("First image comparison difference", name, x, y, "actual RGBA", qRed(actualPixel),
+                    qGreen(actualPixel), qBlue(actualPixel), qAlpha(actualPixel), "expected RGBA", qRed(expectedPixel),
+                    qGreen(expectedPixel), qBlue(expectedPixel), qAlpha(expectedPixel)));
+      ++differentPixels;
+      maxChannelDifference = std::max({maxChannelDifference, std::abs(qRed(actualPixel) - qRed(expectedPixel)),
+                                       std::abs(qGreen(actualPixel) - qGreen(expectedPixel)),
+                                       std::abs(qBlue(actualPixel) - qBlue(expectedPixel)),
+                                       std::abs(qAlpha(actualPixel) - qAlpha(expectedPixel))});
+      // Include alpha-only differences in the visible mask.
+      difference.setPixel(x, y, qRgb(255, 0, 255));
+    }
+  }
+
+  auto const prefix = GetPlatform().WritablePathForFile(name);
+  LOG(LINFO, ("Image comparison", name, "different pixels", differentPixels, "maximum channel difference",
+              maxChannelDifference, "images", prefix));
+  auto const save = [&](QImage const & image, char const * suffix)
+  {
+    auto const path = prefix + suffix;
+    if (!image.save(QString::fromStdString(path), "PNG"))
+      LOG(LWARNING, ("Cannot save image comparison", path));
+  };
+  save(actual, "-actual.png");
+  save(expected, "-expected.png");
+  save(difference, "-difference-mask.png");
+  return false;
+}
+
+}  // namespace df::test_support

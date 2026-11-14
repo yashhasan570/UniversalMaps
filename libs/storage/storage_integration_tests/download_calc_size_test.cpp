@@ -1,0 +1,72 @@
+#include "testing/testing.hpp"
+
+#include "storage/storage_integration_tests/test_defines.hpp"
+
+#include "storage/storage.hpp"
+
+#include "platform/downloader_defines.hpp"
+#include "platform/platform.hpp"
+
+namespace download_calc_size_test
+{
+using namespace storage;
+
+void InitStorage(Storage & storage, Storage::UpdateCallback const & didDownload,
+                 Storage::ProgressFunction const & progress)
+{
+  auto const changeCountryFunction = [&](CountryId const & /* countryId */)
+  {
+    if (!storage.IsDownloadInProgress())
+    {
+      // End wait for downloading complete.
+      testing::StopEventLoop();
+    }
+  };
+
+  storage.Init(didDownload, [](CountryId const &, LocalFilePtr const) { return false; });
+  storage.RegisterAllLocalMaps();
+  storage.Subscribe(changeCountryFunction, progress);
+  storage.SetDownloadingServersForTesting({kTestWebServer});
+}
+
+UNIT_CLASS_TEST(StorageTest, DownloadingTests_CalcOverallProgress)
+{
+  // A bunch of small islands.
+  CountriesVec const kTestCountries = {"Kiribati", "Tokelau", "Niue", "Palau", "Pitcairn Islands"};
+
+  Storage s(ReadCountriesJson(), GetDownloader());
+
+  s.SetDownloadingServersForTesting({storage::kTestWebServer});
+  auto baseProgress = s.GetOverallProgress(kTestCountries);
+
+  TEST_EQUAL(baseProgress.m_bytesDownloaded, 0, ());
+  TEST_EQUAL(baseProgress.m_bytesTotal, 0, ());
+
+  for (auto const & country : kTestCountries)
+    baseProgress.m_bytesTotal += s.CountrySizeInBytes(country).second;
+
+  bool batchQueued = false;
+  auto progressChanged =
+      [&s, &kTestCountries, &baseProgress, &batchQueued](CountryId const & id, storage::Progress const & /* progress */)
+  {
+    if (!batchQueued)
+      return;
+    auto const currentProgress = s.GetOverallProgress(kTestCountries);
+    LOG_SHORT(LINFO, (id, "downloading progress:", currentProgress));
+
+    TEST_GREATER_OR_EQUAL(currentProgress.m_bytesDownloaded, baseProgress.m_bytesDownloaded, ());
+    baseProgress.m_bytesDownloaded = currentProgress.m_bytesDownloaded;
+
+    TEST_LESS_OR_EQUAL(currentProgress.m_bytesDownloaded, baseProgress.m_bytesTotal, ());
+    TEST_EQUAL(currentProgress.m_bytesTotal, baseProgress.m_bytesTotal, ());
+  };
+
+  InitStorage(s, [](storage::CountryId const &, LocalFilePtr const) {}, progressChanged);
+
+  for (auto const & countryId : kTestCountries)
+    s.DownloadNode(countryId);
+
+  batchQueued = true;
+  testing::RunEventLoop();
+}
+}  // namespace download_calc_size_test

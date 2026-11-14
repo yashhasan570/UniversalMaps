@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+}
+
+apply from: "${rootProject.rootDir}/groovy/common-config.gradle"
+
+android {
+  namespace = 'com.universalmaps.app.sdk.wear.gms'
+  enableKotlin = true  // see app/build.gradle
+}
+
+dependencies {
+  implementation project(':libs:wear-protocol-gms')
+  implementation project(':sdk:wear:core')
+
+  implementation libs.google.gms.wearable
+
+  testImplementation libs.androidx.junit
+  testImplementation libs.mockito.core
+  testImplementation libs.robolectric
+}
