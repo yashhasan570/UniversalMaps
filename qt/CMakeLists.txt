@@ -217,6 +217,11 @@ if (PLATFORM_LINUX)
   install(FILES ${OMIM_ROOT}/packaging/com.universalmaps.app.desktop.metainfo.xml DESTINATION share/metainfo/)
   install(FILES ${OMIM_ROOT}/qt/res/linux/com.universalmaps.app.desktop.desktop DESTINATION share/applications/)
   install(FILES ${OMIM_ROOT}/qt/res/logo.png DESTINATION share/icons/hicolor/512x512/apps/ RENAME universalmaps.png)
+  # LICENSE is a source-tree symlink whose target directory is not installed.
+  install(FILES ${OMIM_ROOT}/LICENSES/Apache-2.0.txt
+          DESTINATION share/licenses/com.universalmaps.app.desktop/ RENAME LICENSE)
+  install(FILES ${OMIM_ROOT}/NOTICE ${OMIM_ROOT}/DATA_LICENSE.txt
+          DESTINATION share/licenses/com.universalmaps.app.desktop/)
 endif()
 
 if (PLATFORM_MAC)
