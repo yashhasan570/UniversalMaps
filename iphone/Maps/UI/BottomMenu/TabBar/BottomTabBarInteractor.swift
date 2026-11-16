@@ -28,7 +28,7 @@ class BottomTabBarInteractor {
 extension BottomTabBarInteractor: BottomTabBarInteractorProtocol {
   @objc
   func configureTabBar() {
-    let isCrowdfunding = false
+    let isCrowdfunding = Settings.canShowCrowdfundingPromo() && Settings.donateUrl() != nil
     viewController?.updateAboutButtonIcon(isCrowdfunding: isCrowdfunding)
   }
 

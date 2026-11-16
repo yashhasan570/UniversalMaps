@@ -25,6 +25,7 @@ final class AboutController: MWMViewController {
   private let logoImageView = UIImageView()
   private let headerTitleLabel = UILabel()
   private let additionalInfoStackView = UIStackView()
+  private var donationView: DonationView?
   private let osmView = OSMView()
   private let infoTableView = UITableView(frame: .zero, style: .plain)
   private let socialMediaHeaderLabel = UILabel()
@@ -117,7 +118,16 @@ private extension AboutController {
       [AboutInfo.noTracking, .noWifi, .community].forEach { additionalInfoStackView.addArrangedSubview(InfoView(image: nil, title: $0.title)) }
     }
 
-      func setupOSM() {
+    func setupDonation() {
+      guard let donationUrl = Settings.donateUrl() else { return }
+      donationView = DonationView(onTap: { [weak self] in
+        if let self, openUrl(donationUrl, externally: true) {
+          Settings.didShowDonationPage()
+        }
+      })
+    }
+
+    func setupOSM() {
       osmView.setMapDate(Self.formattedMapsDataVersion())
       osmView.didTapHandler = { [weak self] in
         self?.openUrl(AppConstants.openStreetMapURL)
@@ -166,6 +176,7 @@ private extension AboutController {
     setupLogo()
     setupHeaderTitle()
     setupAdditionalInfo()
+    setupDonation()
     setupOSM()
     setupInfoTable()
     setupSocialMediaCollection()
@@ -181,6 +192,9 @@ private extension AboutController {
     stackView.addArrangedSubview(logoImageView)
     stackView.addArrangedSubview(headerTitleLabel)
     stackView.addArrangedSubviewWithSeparator(additionalInfoStackView)
+    if let donationView {
+      stackView.addArrangedSubviewWithSeparator(donationView)
+    }
     stackView.addArrangedSubviewWithSeparator(osmView)
     stackView.addArrangedSubviewWithSeparator(infoTableView)
     stackView.addArrangedSubviewWithSeparator(socialMediaHeaderLabel)
@@ -227,6 +241,7 @@ private extension AboutController {
 
       termsOfUseAndPrivacyPolicyView.widthAnchor.constraint(equalTo: stackView.widthAnchor),
     ])
+    donationView?.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = donationView != nil
   }
 
   func updateCollection() {

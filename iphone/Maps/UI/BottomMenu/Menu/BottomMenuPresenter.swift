@@ -8,6 +8,7 @@ class BottomMenuPresenter: NSObject {
     case addPlace
     case recordTrack
     case downloadMaps
+    case donate
     case settings
     case share
   }
@@ -32,7 +33,8 @@ class BottomMenuPresenter: NSObject {
     self.view = view
     self.interactor = interactor
     self.sections = sections
-    menuCells = CellType.allCases
+    let disableDonate = Settings.donateUrl() == nil
+    menuCells = CellType.allCases.filter { disableDonate ? $0 != .donate : true }
     let mapsStorage = Storage.shared()
     self.mapsStorage = mapsStorage
     countryId = mapsStorage.countryForViewportCenter()
@@ -111,6 +113,9 @@ extension BottomMenuPresenter {
         cell.configure(image: UIImage(resource: .icMenuDownload),
                        title: L("download_maps"),
                        badgeCount: MapsAppDelegate.theApp().badgeNumber())
+      case .donate:
+        cell.configure(image: Settings.isNY() ? UIImage(resource: .icChristmasTree) : UIImage(resource: .icMenuDonate),
+                       title: L("donate"))
       case .settings:
         cell.configure(image: UIImage(resource: .icMenuSettings),
                        title: L("settings"))
@@ -161,6 +166,8 @@ extension BottomMenuPresenter {
         interactor.toggleTrackRecording()
       case .downloadMaps:
         interactor.downloadMaps()
+      case .donate:
+        interactor.donate()
       case .settings:
         interactor.openSettings()
       case .share:

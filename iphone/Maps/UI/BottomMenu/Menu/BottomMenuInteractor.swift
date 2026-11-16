@@ -3,6 +3,7 @@ protocol BottomMenuInteractorProtocol: AnyObject {
   func addPlace()
   func downloadMaps()
   func startDownloadingMapForCountry(_ countryId: String)
+  func donate()
   func openSettings()
   func shareLocation(cell: BottomMenuItemCell)
   func toggleTrackRecording()
@@ -44,6 +45,13 @@ extension BottomMenuInteractor: BottomMenuInteractorProtocol {
 
   func addPlace() {
     delegate?.addPlace()
+  }
+
+  func donate() {
+    close()
+    if let url = Settings.donateUrl(), viewController?.openUrl(url, externally: true) == true {
+      Settings.didShowDonationPage()
+    }
   }
 
   func downloadMaps() {

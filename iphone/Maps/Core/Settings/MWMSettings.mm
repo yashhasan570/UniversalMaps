@@ -327,7 +327,7 @@ NSString * const kUDDidShowICloudSynchronizationEnablingAlert = @"kUDDidShowIClo
 
 + (BOOL)canShowCrowdfundingPromo
 {
-  return NO;
+  return GetFramework().CanShowCrowdfundingPromo();
 }
 
 + (void)didShowDonationPage
