@@ -62,7 +62,7 @@ public final class AndroidAutoService extends CarAppServiceBase
     {
       try
       {
-        app.initUniversalMaps(null);
+        app.initUniversalMaps();
       }
       catch (IOException e)
       {

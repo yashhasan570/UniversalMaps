@@ -35,10 +35,8 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.core.app.NavUtils;
 import androidx.core.os.BundleCompat;
-import androidx.fragment.app.Fragment;
 import com.universalmaps.app.BuildConfig;
 import com.universalmaps.app.MwmActivity;
-import com.universalmaps.app.MwmApplication;
 import com.universalmaps.app.R;
 import com.universalmaps.app.sdk.util.Config;
 import com.universalmaps.app.sdk.util.Constants;
@@ -385,16 +383,6 @@ public class Utils
     }
   }
 
-  public static void detachFragmentIfCoreNotInitialized(@NonNull Context context, @NonNull Fragment fragment)
-  {
-    if (MwmApplication.from(context).getUniversalMaps().arePlatformAndCoreInitialized())
-      return;
-
-    if (!fragment.isAdded())
-      return;
-
-    fragment.getParentFragmentManager().beginTransaction().detach(fragment).commit();
-  }
   public static String getLocalizedLevel(@NonNull Context context, @Nullable String level)
   {
     if (TextUtils.isEmpty(level))

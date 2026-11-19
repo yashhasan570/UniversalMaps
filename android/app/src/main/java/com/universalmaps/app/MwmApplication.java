@@ -24,6 +24,7 @@ import com.universalmaps.app.downloader.DownloaderNotifier;
 import com.universalmaps.app.location.TrackRecordingService;
 import com.universalmaps.app.routing.NavigationService;
 import com.universalmaps.app.sdk.Map;
+import com.universalmaps.app.sdk.MapsReadiness;
 import com.universalmaps.app.sdk.UniversalMaps;
 import com.universalmaps.app.sdk.display.DisplayManager;
 import com.universalmaps.app.sdk.location.LocationHelper;
@@ -95,6 +96,12 @@ public class MwmApplication extends Application implements Application.ActivityL
   }
 
   @NonNull
+  public MapsReadiness getMapsReadiness()
+  {
+    return getUniversalMaps().getMapsReadiness();
+  }
+
+  @NonNull
   public DisplayManager getDisplayManager()
   {
     return mDisplayManager;
@@ -129,6 +136,10 @@ public class MwmApplication extends Application implements Application.ActivityL
     PreferenceManager.setDefaultValues(this, R.xml.prefs_main, false);
     mUniversalMaps = new UniversalMaps(getApplicationContext(), BuildConfig.FLAVOR, BuildConfig.APPLICATION_ID,
                                    BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME);
+    getMapsReadiness().runWhenReady(() -> {
+      ThemeSwitcher.INSTANCE.synchronizeApplicationTheme();
+      ProcessLifecycleOwner.get().getLifecycle().addObserver(mProcessLifecycleObserver);
+    });
 
     DownloaderNotifier.createNotificationChannel(this);
     initNavigationService();
@@ -153,15 +164,10 @@ public class MwmApplication extends Application implements Application.ActivityL
     mDisplayManager = new DisplayManager();
   }
 
-  public boolean initUniversalMaps(@Nullable Runnable onComplete) throws IOException
+  public void initUniversalMaps() throws IOException
   {
     ThemeSwitcher.INSTANCE.initialize(this);
-    return mUniversalMaps.init(() -> {
-      ThemeSwitcher.INSTANCE.synchronizeApplicationTheme();
-      ProcessLifecycleOwner.get().getLifecycle().addObserver(mProcessLifecycleObserver);
-      if (onComplete != null)
-        onComplete.run();
-    });
+    mUniversalMaps.init();
   }
 
   private final LifecycleObserver mProcessLifecycleObserver = new DefaultLifecycleObserver() {

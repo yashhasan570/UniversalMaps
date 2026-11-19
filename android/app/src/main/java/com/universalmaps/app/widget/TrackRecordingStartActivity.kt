@@ -43,7 +43,7 @@ class TrackRecordingStartActivity : Activity() {
         val app = MwmApplication.from(this)
         if (!app.universalMaps.arePlatformAndCoreInitialized()) {
             try {
-                app.initUniversalMaps(null)
+                app.initUniversalMaps()
             } catch (e: IOException) {
                 Logger.e(TAG, "Failed to initialize the app", e)
                 return false

@@ -52,8 +52,8 @@ public class NavigationServiceLifetimeTest
     onMain(() -> {
       try
       {
-        if (!mApplication.initUniversalMaps(initialized::countDown))
-          initialized.countDown();
+        mApplication.initUniversalMaps();
+        mApplication.getMapsReadiness().runWhenReady(initialized::countDown);
       }
       catch (IOException e)
       {

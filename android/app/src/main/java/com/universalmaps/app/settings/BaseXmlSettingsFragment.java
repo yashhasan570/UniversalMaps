@@ -1,6 +1,5 @@
 package com.universalmaps.app.settings;
 
-import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
 import androidx.annotation.NonNull;
@@ -12,7 +11,6 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import com.universalmaps.app.R;
-import com.universalmaps.app.util.Utils;
 import com.universalmaps.app.util.WindowInsetUtils.ScrollableContentInsetsListener;
 
 abstract class BaseXmlSettingsFragment extends PreferenceFragmentCompat
@@ -31,13 +29,6 @@ abstract class BaseXmlSettingsFragment extends PreferenceFragmentCompat
   public void onCreatePreferences(Bundle bundle, String root)
   {
     setPreferencesFromResource(getXmlResources(), root);
-  }
-
-  @Override
-  public void onAttach(@NonNull Context context)
-  {
-    super.onAttach(context);
-    Utils.detachFragmentIfCoreNotInitialized(context, this);
   }
 
   @Override
